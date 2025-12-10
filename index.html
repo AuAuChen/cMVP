@@ -47,10 +47,9 @@
         /* 定義卡片在列印與預覽時的物理尺寸與定位基準 */
         .print-card {
             /* 寬高將由 JS 動態控制 */
-            border: 1px solid #ccc; /* 裁切線 (預覽時顯示) */
+            /* border: 1px solid #ccc;  Moved to inline style logic */
             position: relative; /* 關鍵：讓內部 absolute 元素相對於卡片定位 */
-            overflow: hidden;
-            background-color: white;
+            /* overflow: hidden; Removed to allow rotated content to show fully if needed, though inner wrapper has overflow:hidden */
             box-sizing: border-box; /* 確保邊框不影響尺寸計算 */
         }
 
@@ -85,7 +84,7 @@
             /* 列印時的微調 */
             .print-card {
                 page-break-inside: avoid;
-                border: 1px solid #ccc; /* 列印時保留裁切線 */
+                /* border: 1px solid #ccc; Handled by inline styles now */
             }
 
             .print-page {
@@ -112,7 +111,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-baseline gap-2">
                     <h1 class="text-xl font-bold">cMVP</h1>
-                    <span class="text-xs text-gray-500 font-mono">v1.3.1</span>
+                    <span class="text-xs text-gray-500 font-mono">v1.4.0</span>
                     <span v-if="currentProject" class="text-xs text-gray-400 bg-gray-700 px-2 py-0.5 rounded-full">
                         {{ currentProject.name }}
                     </span>
@@ -169,8 +168,19 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr v-for="(type, index) in globalLibrary" :key="type.id" class="border-b">
-                                    <td class="p-2">{{ type.name }}</td>
+                                <tr v-for="(type, index) in globalLibrary" :key="type.id" class="border-b hover:bg-gray-50 transition" @dblclick="startTypeRenaming(type)">
+                                    <td class="p-2">
+                                        <span v-if="renamingTypeId !== type.id" class="select-none">{{ type.name }}</span>
+                                        <input 
+                                            v-else 
+                                            v-model="type.name" 
+                                            @blur="finishTypeRenaming" 
+                                            @keydown.enter="finishTypeRenaming"
+                                            @click.stop
+                                            ref="typeNameInput"
+                                            class="w-32 border rounded px-1 py-0.5 text-sm font-bold text-gray-700"
+                                        >
+                                    </td>
                                     <td class="p-2 text-sm text-gray-500">{{ type.width || 63 }}x{{ type.height || 88 }}mm</td>
                                     <td class="p-2 text-sm text-gray-500">{{ type.sourceProject || '-' }}</td>
                                     <td class="p-2">{{ type.elements.length }}</td>
@@ -218,11 +228,22 @@
                             v-for="(card, idx) in currentProject.cards" 
                             :key="card.id"
                             @click="selectCard(card.id)"
+                            @dblclick="startCardRenaming(card)"
                             class="p-3 border-b cursor-pointer hover:bg-blue-50 flex justify-between items-center group"
                             :class="{'bg-blue-100 border-l-4 border-l-blue-500': currentCard && currentCard.id === card.id}"
                         >
-                            <span class="truncate text-sm font-medium">{{ idx + 1 }}. {{ card.name || '未命名卡片' }}</span>
-                            <div class="hidden group-hover:flex gap-1">
+                            <span v-if="renamingCardId !== card.id" class="truncate text-sm font-medium select-none">{{ idx + 1 }}. {{ card.name || '未命名卡片' }}</span>
+                            <input 
+                                v-else 
+                                v-model="card.name" 
+                                @blur="finishCardRenaming" 
+                                @keydown.enter="finishCardRenaming"
+                                @click.stop
+                                ref="cardNameInput"
+                                class="flex-1 min-w-0 border rounded px-1 py-0.5 text-sm mr-2"
+                            >
+                            
+                            <div v-if="renamingCardId !== card.id" class="hidden group-hover:flex gap-1">
                                 <button @click.stop="cloneCard(card)" title="複製" class="text-xs text-gray-500 hover:text-blue-600">📄</button>
                                 <button @click.stop="deleteCard(idx)" title="刪除" class="text-xs text-gray-500 hover:text-red-600">🗑️</button>
                             </div>
@@ -258,10 +279,20 @@
                         <div 
                             v-for="(type, idx) in currentProject.localTypes" 
                             :key="type.id"
+                            @dblclick="startTypeRenaming(type)"
                             class="bg-white border rounded p-3 shadow-sm hover:shadow transition group relative"
                         >
                             <div class="flex justify-between items-start mb-2">
-                                <span class="font-bold text-sm text-gray-700 truncate mr-2">{{ type.name }}</span>
+                                <span v-if="renamingTypeId !== type.id" class="font-bold text-sm text-gray-700 truncate mr-2 select-none">{{ type.name }}</span>
+                                <input 
+                                    v-else 
+                                    v-model="type.name" 
+                                    @blur="finishTypeRenaming" 
+                                    @keydown.enter="finishTypeRenaming"
+                                    @click.stop
+                                    ref="typeNameInput"
+                                    class="flex-1 min-w-0 border rounded px-1 py-0.5 text-sm font-bold text-gray-700 mr-2"
+                                >
                                 <button @click="deleteLocalType(idx)" class="text-gray-400 hover:text-red-500 flex-shrink-0" title="刪除版型">🗑️</button>
                             </div>
                             <div class="text-xs text-gray-500 mb-2 flex gap-2">
@@ -375,12 +406,14 @@
             </div>
 
             <!-- 右側：屬性檢查器 (Inspector) -->
-            <div class="w-72 bg-white border-l flex flex-col z-10 overflow-y-auto">
-                <div class="p-4 border-b bg-gray-50">
-                    <h3 class="font-bold text-gray-700">🎨 屬性檢查器</h3>
-                </div>
+            <div class="w-72 bg-white border-l flex flex-col z-10">
+                <!-- 上半部：屬性編輯區 (可滾動) -->
+                <div class="flex-1 overflow-y-auto min-h-0">
+                    <div class="p-4 border-b bg-gray-50 sticky top-0 z-10">
+                        <h3 class="font-bold text-gray-700">🎨 屬性檢查器</h3>
+                    </div>
 
-                <div v-if="selectedElement" class="p-4 space-y-4">
+                    <div v-if="selectedElement" class="p-4 space-y-4">
                     <!-- 通用屬性 -->
                     <div>
                         <label class="text-xs font-bold text-gray-500 block mb-1">位置與尺寸 (px)</label>
@@ -423,12 +456,20 @@
                     </div>
 
                     <div>
-                        <label class="text-xs font-bold text-gray-500 block mb-1">層級 (Z-Index 0-100)</label>
-                        <div class="flex gap-2 mb-2">
-                             <button @click="selectedElement.z = 100" class="flex-1 bg-gray-100 border hover:bg-gray-200 text-xs py-1 rounded">置頂</button>
-                             <button @click="selectedElement.z = 0" class="flex-1 bg-gray-100 border hover:bg-gray-200 text-xs py-1 rounded">置底</button>
+                        <label class="text-xs font-bold text-gray-500 block mb-1">層級 (Z-Index)</label>
+                        <div class="flex gap-2 items-center">
+                            <div class="flex border rounded overflow-hidden flex-1 h-9">
+                                <button @click="bringToFront" class="flex-1 bg-gray-50 hover:bg-gray-100 border-r text-xs font-bold flex items-center justify-center gap-1" title="移至最上層">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
+                                    置頂
+                                </button>
+                                <button @click="sendToBack" class="flex-1 bg-gray-50 hover:bg-gray-100 text-xs font-bold flex items-center justify-center gap-1" title="移至最下層">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                                    置底
+                                </button>
+                            </div>
+                            <input type="number" v-model.number="selectedElement.z" min="0" max="100" class="w-20 border rounded px-2 py-2 text-sm text-center h-9" title="手動輸入層級">
                         </div>
-                        <input type="number" v-model.number="selectedElement.z" min="0" max="100" class="w-full border rounded px-2 py-1 text-sm">
                     </div>
 
                     <!-- 形狀專屬 -->
@@ -471,31 +512,63 @@
                         <label class="text-xs font-bold text-gray-500 block mb-1">內容與文字</label>
                         <textarea v-model="selectedElement.content" rows="3" class="w-full border rounded p-2 text-sm mb-2" placeholder="輸入文字..."></textarea>
                         
-                        <div class="grid grid-cols-2 gap-2 mb-2">
-                            <div>
-                                <span class="text-xs text-gray-400">字體大小</span>
-                                <input type="number" v-model.number="selectedElement.fontSize" class="w-full border rounded px-2 py-1 text-sm">
+                        <div class="mb-4">
+                            <span class="text-xs text-gray-400 block mb-1">字體大小 & 對齊</span>
+                            <div class="flex gap-2 items-center">
+                                <input type="number" v-model.number="selectedElement.fontSize" class="w-20 border rounded px-2 py-2 text-sm text-center" title="字體大小">
+                                
+                                <div class="flex border rounded overflow-hidden flex-1 h-9">
+                                    <button @click="selectedElement.textAlign = 'left'" :class="{'bg-gray-200': selectedElement.textAlign === 'left'}" class="flex-1 hover:bg-gray-100 border-r flex justify-center items-center" title="靠左對齊">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <line x1="17" y1="10" x2="3" y2="10"></line>
+                                            <line x1="21" y1="6" x2="3" y2="6"></line>
+                                            <line x1="21" y1="14" x2="3" y2="14"></line>
+                                            <line x1="17" y1="18" x2="3" y2="18"></line>
+                                        </svg>
+                                    </button>
+                                    <button @click="selectedElement.textAlign = 'center'" :class="{'bg-gray-200': selectedElement.textAlign === 'center'}" class="flex-1 hover:bg-gray-100 border-r flex justify-center items-center" title="置中對齊">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <line x1="21" y1="6" x2="3" y2="6"></line>
+                                            <line x1="17" y1="10" x2="7" y2="10"></line>
+                                            <line x1="19" y1="14" x2="5" y2="14"></line>
+                                            <line x1="21" y1="18" x2="3" y2="18"></line>
+                                        </svg>
+                                    </button>
+                                    <button @click="selectedElement.textAlign = 'right'" :class="{'bg-gray-200': selectedElement.textAlign === 'right'}" class="flex-1 hover:bg-gray-100 flex justify-center items-center" title="靠右對齊">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <line x1="21" y1="10" x2="7" y2="10"></line>
+                                            <line x1="21" y1="6" x2="3" y2="6"></line>
+                                            <line x1="21" y1="14" x2="3" y2="14"></line>
+                                            <line x1="21" y1="18" x2="7" y2="18"></line>
+                                        </svg>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                         <color-picker v-model="selectedElement.color" label="文字顏色" class="mb-4"></color-picker>
-                        
-                        <div class="flex border rounded overflow-hidden">
-                            <button @click="selectedElement.textAlign = 'left'" :class="{'bg-gray-200': selectedElement.textAlign === 'left'}" class="flex-1 py-1 hover:bg-gray-100 border-r">Left</button>
-                            <button @click="selectedElement.textAlign = 'center'" :class="{'bg-gray-200': selectedElement.textAlign === 'center'}" class="flex-1 py-1 hover:bg-gray-100 border-r">Center</button>
-                            <button @click="selectedElement.textAlign = 'right'" :class="{'bg-gray-200': selectedElement.textAlign === 'right'}" class="flex-1 py-1 hover:bg-gray-100">Right</button>
-                        </div>
                     </div>
 
-                    <div class="pt-4 border-t mt-4">
-                        <button @click="removeElement(selectedElement.id)" class="w-full bg-red-100 text-red-600 py-2 rounded text-sm hover:bg-red-200 font-bold">🗑️ 刪除元素</button>
+                    <div class="pt-4 border-t mt-4" v-if="false"> <!-- Removed Delete Button from here -->
                     </div>
                 </div>
                 
                 <div v-else-if="currentCard" class="p-4 space-y-4">
                     <!-- 卡片本身屬性 -->
                     <div>
-                        <label class="text-xs font-bold text-gray-500 block mb-1">卡片名稱</label>
-                        <input type="text" v-model="currentCard.name" class="w-full border rounded px-2 py-2 text-sm">
+                        <label class="text-xs font-bold text-gray-500 block mb-1">卡片尺寸與方向</label>
+                        <div class="flex gap-2 mb-2">
+                             <button @click="setCardOrientation('portrait')" :class="{'bg-blue-100 border-blue-500 text-blue-700': isPortrait, 'bg-gray-50 hover:bg-gray-100': !isPortrait}" class="flex-1 border rounded py-2 text-xs font-bold flex flex-col items-center gap-1 transition">
+                                <div class="w-3 h-4 border-2 border-current rounded-sm"></div>
+                                直式
+                             </button>
+                             <button @click="setCardOrientation('landscape')" :class="{'bg-blue-100 border-blue-500 text-blue-700': !isPortrait, 'bg-gray-50 hover:bg-gray-100': isPortrait}" class="flex-1 border rounded py-2 text-xs font-bold flex flex-col items-center gap-1 transition">
+                                <div class="w-4 h-3 border-2 border-current rounded-sm"></div>
+                                橫式
+                             </button>
+                        </div>
+                        <div class="flex items-center gap-2 text-xs text-gray-500 justify-center">
+                            {{ currentCard.width || 63 }} x {{ currentCard.height || 88 }} mm
+                        </div>
                     </div>
 
                     <!-- 卡片外觀 -->
@@ -506,11 +579,15 @@
                         <color-picker v-model="currentCard.borderColor" label="外框顏色"></color-picker>
 
                         <div>
-                            <div class="flex items-center justify-between mb-1">
-                                <span class="text-sm">外框寬度</span>
-                                <input type="number" v-model.number="currentCard.borderWidth" min="0" max="20" class="w-16 border rounded px-2 py-1 text-sm text-right" placeholder="0">
+                            <span class="text-xs font-bold text-gray-500 block mb-1">外框寬度</span>
+                            <div class="flex items-center gap-2">
+                                <input type="number" v-model.number="currentCard.borderWidth" min="0" max="20" class="w-16 border rounded px-2 py-1 text-sm text-center" placeholder="0">
+                                <div class="flex border rounded overflow-hidden">
+                                    <button @click="currentCard.borderWidth = 1" class="px-3 py-1 bg-white hover:bg-gray-100 border-r text-xs font-medium text-gray-600 transition">1</button>
+                                    <button @click="currentCard.borderWidth = 2" class="px-3 py-1 bg-white hover:bg-gray-100 border-r text-xs font-medium text-gray-600 transition">2</button>
+                                    <button @click="currentCard.borderWidth = 5" class="px-3 py-1 bg-white hover:bg-gray-100 text-xs font-medium text-gray-600 transition">5</button>
+                                </div>
                             </div>
-                            <input type="range" v-model.number="currentCard.borderWidth" min="0" max="20" class="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer">
                         </div>
                     </div>
 
@@ -535,7 +612,52 @@
                     請選擇一個元素或卡片以編輯屬性
                 </div>
             </div>
+
+            <!-- 下半部：圖層清單 -->
+            <div class="h-1/3 border-t flex flex-col bg-white" v-if="currentCard">
+                <div class="p-2 border-b bg-gray-50 text-xs font-bold text-gray-500 flex justify-between items-center">
+                    <span>圖層清單 ({{ currentCard.elements.length }})</span>
+                </div>
+                <div class="flex-1 overflow-y-auto p-2 space-y-1">
+                    <div 
+                        v-for="el in elementList" 
+                        :key="el.id"
+                        class="flex items-center gap-2 p-2 rounded border hover:border-blue-300 transition text-sm group"
+                        :class="{'bg-blue-50 border-blue-500': selectedElementId === el.id, 'bg-white border-transparent hover:bg-gray-50': selectedElementId !== el.id}"
+                        @click="selectCard(currentCard.id); selectedElementId = el.id"
+                    >
+                        <!-- Icon -->
+                        <div class="text-xs w-5 text-center flex-shrink-0">
+                            <span v-if="el.type === 'text'">📝</span>
+                            <span v-else>
+                                <div class="w-3 h-3 mx-auto border border-gray-300" :style="{backgroundColor: el.color, borderRadius: el.shapeType === 'circle' ? '50%' : '0'}"></div>
+                            </span>
+                        </div>
+                        
+                        <!-- Content Preview -->
+                        <div class="flex-1 truncate select-none">
+                            <span v-if="el.type === 'text'" class="font-medium text-gray-700">{{ el.content || '(空白文字)' }}</span>
+                            <span v-else class="text-gray-500 capitalize">{{ el.shapeType }}</span>
+                        </div>
+
+                        <!-- Z-Index Badge -->
+                        <div class="text-[10px] text-gray-400 font-mono bg-gray-100 px-1 rounded">
+                            z:{{ el.z }}
+                        </div>
+
+                        <!-- Actions -->
+                        <div class="flex gap-1 ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button @click.stop="cloneElement(el)" title="複製" class="p-1 hover:bg-blue-100 rounded text-gray-500 hover:text-blue-600">📄</button>
+                            <button @click.stop="removeElement(el.id)" title="刪除" class="p-1 hover:bg-red-100 rounded text-gray-500 hover:text-red-600">🗑️</button>
+                        </div>
+                    </div>
+                    <div v-if="currentCard.elements.length === 0" class="text-center text-gray-400 text-xs mt-4">
+                        尚無元素
+                    </div>
+                </div>
+            </div>
         </div>
+    </div>
 
         <!-- 3. 輸出列印視圖 (Print Preview) -->
         <div v-if="currentView === 'print' && currentProject" class="flex flex-1 overflow-hidden">
@@ -588,10 +710,11 @@
                             <input 
                                 type="number" 
                                 v-model.number="printQuantities[card.id]" 
-                                min="1" 
+                                min="0" 
                                 class="w-12 border rounded px-1 text-right text-sm"
-                                :disabled="!printSelection.includes(card.id)"
+                                @input="onQuantityChange(card.id, $event.target.value)"
                                 title="列印張數"
+                                placeholder="0"
                             >
                         </div>
                     </div>
@@ -618,24 +741,38 @@
                         <div 
                             v-for="card in pageCards" 
                             :key="card._printId" 
-                            class="print-card"
+                            class="print-card relative"
                             :style="{
-                                width: (card.width || 63) + 'mm',
-                                height: (card.height || 88) + 'mm',
-                                backgroundColor: card.bgColor || '#ffffff',
-                                border: `${(card.borderWidth || 0) * 0.2625}mm solid ${card.borderColor || '#000000'}`
+                                width: card._printW + 'mm',
+                                height: card._printH + 'mm',
                             }"
                         >
-                            <!-- Print Card Content -->
+                            <!-- Card Content Wrapper (Handles rotation and actual card visuals) -->
                             <div 
-                                v-for="el in card.elements" 
-                                :key="el.id"
-                                :style="getPrintElementStyle(el)"
-                                class="absolute flex items-center justify-center overflow-hidden"
+                                class="absolute overflow-hidden"
+                                :style="{
+                                    width: (card.width || 63) + 'mm',
+                                    height: (card.height || 88) + 'mm',
+                                    top: card._rotate ? '50%' : '0',
+                                    left: card._rotate ? '50%' : '0',
+                                    transform: card._rotate ? 'translate(-50%, -50%) rotate(90deg)' : 'none',
+                                    backgroundColor: card.bgColor || '#ffffff',
+                                    border: `${(card.borderWidth || 0) * 0.2625}mm solid ${card.borderColor || '#000000'}`,
+                                    // Add a light border for cutting line in preview/print if actual border is 0
+                                    outline: (card.borderWidth || 0) === 0 ? '1px solid #ccc' : 'none'
+                                }"
                             >
-                                <span v-if="el.type === 'text'" :style="{ fontSize: scaleVal(el.fontSize) + 'px', color: el.color, textAlign: el.textAlign }" class="w-full whitespace-pre-wrap leading-tight">
-                                    {{ el.content }}
-                                </span>
+                                <!-- Print Card Elements -->
+                                <div 
+                                    v-for="el in card.elements" 
+                                    :key="el.id"
+                                    :style="getPrintElementStyle(el)"
+                                    class="absolute flex items-center justify-center overflow-hidden"
+                                >
+                                    <span v-if="el.type === 'text'" :style="{ fontSize: scaleVal(el.fontSize) + 'px', color: el.color, textAlign: el.textAlign }" class="w-full whitespace-pre-wrap leading-tight">
+                                        {{ el.content }}
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -714,6 +851,8 @@
                     showNewCardMenu: false, // New: Toggle for new card dropdown
                     editingElementId: null, // New: Track which element is being edited
                     isEditingText: false,   // New: Flag to pause history during text edit
+                    renamingCardId: null,   // New: Track which card is being renamed in sidebar
+                    renamingTypeId: null,   // New: Track which template is being renamed
                     sidebarTab: 'cards',    // 'cards' or 'templates'
                     
                     // Print State
@@ -750,6 +889,18 @@
                     if (!this.currentCard || !this.selectedElementId) return null;
                     return this.currentCard.elements.find(e => e.id === this.selectedElementId);
                 },
+                isPortrait() {
+                    if (!this.currentCard) return true;
+                    return (this.currentCard.height || 88) >= (this.currentCard.width || 63);
+                },
+                elementList() {
+                    if (!this.currentCard) return [];
+                    // Sort by z-index descending, then by array index descending (later in array = on top)
+                    return this.currentCard.elements.map((el, index) => ({ el, index })).sort((a, b) => {
+                        if (a.el.z !== b.el.z) return b.el.z - a.el.z;
+                        return b.index - a.index;
+                    }).map(item => item.el);
+                },
                 printableCards() {
                     if (!this.currentProject) return [];
                     const result = [];
@@ -758,12 +909,18 @@
                         const card = this.currentProject.cards.find(c => c.id === id);
                         if (card) {
                             const qty = this.printQuantities[id] || 1;
+                            const w = card.width || 63;
+                            const h = card.height || 88;
+                            const isLandscape = w > h;
+
                             for (let i = 0; i < qty; i++) {
-                                // Create a wrapper or clone to ensure unique key for v-for
-                                // Or we can just use the card object and handle key in template
                                 result.push({
                                     ...card,
-                                    _printId: `${card.id}_${i}` // Unique key for v-for
+                                    _printId: `${card.id}_${i}`,
+                                    _rotate: isLandscape,
+                                    // If rotating, use swapped dimensions for layout
+                                    _printW: isLandscape ? h : w,
+                                    _printH: isLandscape ? w : h
                                 });
                             }
                         }
@@ -777,10 +934,10 @@
 
                     // Determine dimensions from the first card (assuming uniform size for batch print)
                     const firstCard = cards[0];
-                    const w = firstCard.width || 63;
-                    const h = firstCard.height || 88;
+                    const w = firstCard._printW;
+                    const h = firstCard._printH;
                     
-                    if (w <= 0 || h <= 0) return [cards];
+                    if (!w || !h || w <= 0 || h <= 0) return [cards];
 
                     const gap = this.printLayoutMode === 'snapped' ? 0 : 2; // mm
                     
@@ -791,11 +948,6 @@
                     const pageH = 297 - 10;
 
                     // Calculate columns and rows
-                    // Note: flex-wrap layout will just flow, but for pagination we need to cut off precisely.
-                    // (Width + gap) * cols - gap <= pageW
-                    // Width * cols + gap * (cols - 1) <= pageW
-                    // Width * cols + gap * cols - gap <= pageW
-                    // cols * (Width + gap) <= pageW + gap
                     const cols = Math.floor((pageW + gap) / (w + gap));
                     const rows = Math.floor((pageH + gap) / (h + gap));
                     
@@ -1005,6 +1157,21 @@
                     clone.elements.forEach(el => el.id = this.uuid());
                     this.currentProject.cards.push(clone);
                 },
+                cloneElement(element) {
+                    if (!this.currentCard) return;
+                    const clone = JSON.parse(JSON.stringify(element));
+                    clone.id = this.uuid();
+                    // clone.x += 10; // Removed offset
+                    // clone.y += 10; // Removed offset
+                    // Put on top by default or keep same z? Let's put on top to see it.
+                    // Or keep same z? Usually clone goes to top.
+                    // Find max z in current elements
+                    const maxZ = this.currentCard.elements.reduce((max, el) => Math.max(max, el.z), 0);
+                    clone.z = maxZ + 1; 
+                    
+                    this.currentCard.elements.push(clone);
+                    this.selectedElementId = clone.id;
+                },
 
                 // --- Editor / Elements ---
                 addElement(type) {
@@ -1045,6 +1212,61 @@
                     this.selectedElementId = null;
                 },
                 
+                startCardRenaming(card) {
+                    this.renamingCardId = card.id;
+                    this.$nextTick(() => {
+                        const inputs = this.$refs.cardNameInput;
+                        if (Array.isArray(inputs)) {
+                             const input = inputs.find(el => el);
+                             if (input) {
+                                 input.focus();
+                                 input.select();
+                             }
+                        } else if (inputs) {
+                             inputs.focus();
+                             inputs.select();
+                        }
+                    });
+                },
+                finishCardRenaming() {
+                    this.renamingCardId = null;
+                },
+
+                startTypeRenaming(type) {
+                    this.renamingTypeId = type.id;
+                    this.$nextTick(() => {
+                        const inputs = this.$refs.typeNameInput;
+                        if (Array.isArray(inputs)) {
+                             const input = inputs.find(el => el);
+                             if (input) {
+                                 input.focus();
+                                 input.select();
+                             }
+                        } else if (inputs) {
+                             inputs.focus();
+                             inputs.select();
+                        }
+                    });
+                },
+                finishTypeRenaming() {
+                    this.renamingTypeId = null;
+                    this.saveData();
+                },
+
+                setCardOrientation(dir) {
+                    if (!this.currentCard) return;
+                    const w = this.currentCard.width || 63;
+                    const h = this.currentCard.height || 88;
+                    
+                    if (dir === 'portrait' && w > h) {
+                        this.currentCard.width = h;
+                        this.currentCard.height = w;
+                    } else if (dir === 'landscape' && h > w) {
+                        this.currentCard.width = h;
+                        this.currentCard.height = w;
+                    }
+                },
+
                 // --- Text Editing ---
                 startTextEditing(element) {
                     if (element.type !== 'text') return;
@@ -1128,6 +1350,32 @@
                         case 'top': el.y = 0; break;
                         case 'center-v': el.y = (cardH - el.h) / 2; break;
                         case 'bottom': el.y = cardH - el.h; break;
+                    }
+                },
+
+                bringToFront() {
+                    if (!this.selectedElement) return;
+                    this.selectedElement.z = 100;
+                    
+                    // Move to end of array to ensure visual top among same z-index
+                    const idx = this.currentCard.elements.indexOf(this.selectedElement);
+                    if (idx !== -1 && idx < this.currentCard.elements.length - 1) {
+                        // Remove and push to end
+                        const el = this.currentCard.elements.splice(idx, 1)[0];
+                        this.currentCard.elements.push(el);
+                    }
+                },
+
+                sendToBack() {
+                    if (!this.selectedElement) return;
+                    this.selectedElement.z = 0;
+                    
+                    // Move to start of array to ensure visual bottom among same z-index
+                    const idx = this.currentCard.elements.indexOf(this.selectedElement);
+                    if (idx !== -1 && idx > 0) {
+                        // Remove and unshift to start
+                        const el = this.currentCard.elements.splice(idx, 1)[0];
+                        this.currentCard.elements.unshift(el);
                     }
                 },
 
@@ -1348,6 +1596,19 @@
                 },
 
                 // --- Print ---
+                onQuantityChange(id, value) {
+                    const val = parseInt(value);
+                    if (!isNaN(val) && val > 0) {
+                        if (!this.printSelection.includes(id)) {
+                            this.printSelection.push(id);
+                        }
+                    } else {
+                        // If 0 or empty, uncheck
+                        if (this.printSelection.includes(id)) {
+                            this.printSelection = this.printSelection.filter(i => i !== id);
+                        }
+                    }
+                },
                 ensureQuantity(id) {
                     if (this.printSelection.includes(id)) {
                         if (!this.printQuantities[id] || this.printQuantities[id] < 1) {
@@ -1378,28 +1639,41 @@
 
                     // Wait for DOM to be ready just in case
                     await this.$nextTick();
+                    
+                    // Small delay to ensure rendering
+                    await new Promise(resolve => setTimeout(resolve, 500));
 
                     const pages = document.querySelectorAll('.print-page');
                     const total = pages.length;
+                    
+                    if (total === 0) {
+                        alert("找不到預覽頁面，請重新整理試試");
+                        this.isExporting = false;
+                        return;
+                    }
 
                     try {
                         for (let i = 0; i < total; i++) {
                             this.exportProgress = `${i + 1} / ${total}`;
                             const page = pages[i];
                             
+                            // Ensure the page is visible in viewport/rendered to avoid blank issues
+                            page.scrollIntoView();
+                            await new Promise(resolve => setTimeout(resolve, 200));
+
                             // Use html2canvas
                             // Force A4 @ 300 PPI size: 2480px x 3508px
                             const targetWidth = 2480;
-                            // Calculate scale based on the actual rendered width in browser
-                            // This handles different screen DPIs automatically
-                            const originalWidth = page.offsetWidth;
+                            const originalWidth = page.offsetWidth || 793; // Fallback width
                             const scaleFactor = targetWidth / originalWidth;
 
                             const canvas = await html2canvas(page, {
                                 scale: scaleFactor, 
                                 backgroundColor: '#ffffff',
                                 useCORS: true, 
-                                logging: false
+                                logging: false,
+                                scrollX: 0,
+                                scrollY: -window.scrollY // Fix for scrolled content
                             });
 
                             // Download
@@ -1410,7 +1684,7 @@
                         }
                     } catch (err) {
                         console.error(err);
-                        alert("圖片匯出失敗，請查看 console");
+                        alert("圖片匯出失敗: " + err.message);
                     } finally {
                         this.isExporting = false;
                         this.exportProgress = '';
