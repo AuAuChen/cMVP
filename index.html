@@ -33,6 +33,7 @@
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
             overflow: hidden;
             position: relative;
+            isolation: isolate; /* Create new stacking context */
             /* 寬高將由 JS 動態控制 */
             transition: transform 0.2s, width 0.2s, height 0.2s;
         }
@@ -49,6 +50,7 @@
             /* 寬高將由 JS 動態控制 */
             /* border: 1px solid #ccc;  Moved to inline style logic */
             position: relative; /* 關鍵：讓內部 absolute 元素相對於卡片定位 */
+            isolation: isolate; /* Create new stacking context */
             /* overflow: hidden; Removed to allow rotated content to show fully if needed, though inner wrapper has overflow:hidden */
             box-sizing: border-box; /* 確保邊框不影響尺寸計算 */
         }
@@ -107,28 +109,75 @@
     <div id="app" class="h-full flex flex-col">
         
         <!-- 頂部導航欄 (No Print) -->
-        <nav class="bg-gray-800 text-white p-3 flex justify-between items-center no-print shadow-md z-50">
-            <div class="flex items-center gap-4">
-                <div class="flex items-baseline gap-2">
-                    <h1 class="text-xl font-bold">cMVP</h1>
-                    <span class="text-xs text-gray-500 font-mono">v1.4.0</span>
-                    <span v-if="currentProject" class="text-xs text-gray-400 bg-gray-700 px-2 py-0.5 rounded-full">
-                        {{ currentProject.name }}
-                    </span>
-                </div>
-                <div class="space-x-2 text-sm">
-                    <button @click="currentView = 'projects'" :class="{'bg-gray-600': currentView === 'projects'}" class="px-3 py-1 rounded hover:bg-gray-700 transition">📂 專案列表</button>
-                    <button v-if="currentProject" @click="currentView = 'editor'" :class="{'bg-gray-600': currentView === 'editor'}" class="px-3 py-1 rounded hover:bg-gray-700 transition">✏️ 卡片編輯</button>
-                    <button v-if="currentProject" @click="currentView = 'print'" :class="{'bg-gray-600': currentView === 'print'}" class="px-3 py-1 rounded hover:bg-gray-700 transition">🖨️ 匯出</button>
+        <nav class="bg-gray-800 text-white p-3 flex flex-nowrap justify-between items-center no-print shadow-md z-50 gap-2 sticky top-0 h-14">
+            <!-- Left: Logo & Hamburger -->
+            <div class="flex items-center gap-4 shrink-0">
+                <div class="flex items-center gap-3">
+                    <!-- Mobile Hamburger Menu -->
+                    <button class="md:hidden text-white focus:outline-none" @click="showLeftSidebar = !showLeftSidebar">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                    </button>
+                    
+                    <div class="flex items-baseline gap-2">
+                        <h1 class="text-xl font-bold">cMVP</h1>
+                        <span class="text-xs text-gray-500 font-mono hidden md:inline">v1.4.1</span>
+                        <span v-if="currentProject" class="text-xs text-gray-400 bg-gray-700 px-2 py-0.5 rounded-full truncate max-w-[100px] md:max-w-none hidden sm:inline">
+                            {{ currentProject.name }}
+                        </span>
+                    </div>
                 </div>
             </div>
-            <div class="flex gap-2 text-sm">
-                <button @click="saveData" class="flex items-center gap-1 bg-green-600 px-3 py-1 rounded hover:bg-green-700">💾 儲存</button>
-                <button @click="exportData" class="flex items-center gap-1 bg-blue-600 px-3 py-1 rounded hover:bg-blue-700">⬇️ 匯出 JSON</button>
-                <label class="flex items-center gap-1 bg-yellow-600 px-3 py-1 rounded hover:bg-yellow-700 cursor-pointer">
-                    ⬆️ 匯入 JSON
-                    <input type="file" @change="importData" class="hidden" accept=".json">
-                </label>
+
+            <!-- Center: View Switcher (Scrollable on mobile) -->
+            <div class="flex gap-2 text-sm overflow-x-auto pb-1 md:pb-0 px-2 flex-1 justify-center md:justify-start scrollbar-hide">
+                <button @click="currentView = 'projects'" :class="{'bg-gray-600': currentView === 'projects'}" class="whitespace-nowrap px-3 py-1 rounded hover:bg-gray-700 transition flex items-center gap-1 shrink-0">
+                    <span>📂</span> <span class="hidden md:inline">專案列表</span>
+                </button>
+                <button v-if="currentProject" @click="currentView = 'editor'" :class="{'bg-gray-600': currentView === 'editor'}" class="whitespace-nowrap px-3 py-1 rounded hover:bg-gray-700 transition flex items-center gap-1 shrink-0">
+                    <span>✏️</span> <span class="hidden md:inline">卡片編輯</span>
+                </button>
+                <button v-if="currentProject" @click="currentView = 'print'" :class="{'bg-gray-600': currentView === 'print'}" class="whitespace-nowrap px-3 py-1 rounded hover:bg-gray-700 transition flex items-center gap-1 shrink-0">
+                    <span>🖨️</span> <span class="hidden md:inline">匯出</span>
+                </button>
+            </div>
+
+            <!-- Right: Actions (Desktop: Buttons, Mobile: Kebab Menu) -->
+            <div class="flex gap-2 text-sm items-center relative shrink-0">
+                <!-- Desktop Buttons -->
+                <div class="hidden md:flex gap-2">
+                    <button @click="saveData" class="flex items-center gap-1 bg-green-600 px-3 py-1 rounded hover:bg-green-700">
+                        <span>💾</span> <span>儲存</span>
+                    </button>
+                    <button @click="exportData" class="flex items-center gap-1 bg-blue-600 px-3 py-1 rounded hover:bg-blue-700">
+                        <span>⬇️</span> <span>匯出 JSON</span>
+                    </button>
+                    <label class="flex items-center gap-1 bg-yellow-600 px-3 py-1 rounded hover:bg-yellow-700 cursor-pointer">
+                        <span>⬆️</span> <span>匯入 JSON</span>
+                        <input type="file" @change="importData" class="hidden" accept=".json">
+                    </label>
+                </div>
+
+                <!-- Mobile Kebab Menu Button -->
+                <button class="md:hidden text-white focus:outline-none p-1" @click="showMobileMenu = !showMobileMenu">
+                    <span class="text-xl leading-none">⋮</span>
+                </button>
+
+                <!-- Mobile Menu Dropdown -->
+                <div v-if="showMobileMenu" class="absolute top-full right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 md:hidden border border-gray-200">
+                    <button @click="saveData(); showMobileMenu = false" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                        💾 儲存
+                    </button>
+                    <button @click="exportData(); showMobileMenu = false" class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                        ⬇️ 匯出 JSON
+                    </button>
+                    <label class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer">
+                        ⬆️ 匯入 JSON
+                        <input type="file" @change="importData" class="hidden" accept=".json">
+                    </label>
+                </div>
+                
+                <!-- Mobile Menu Backdrop -->
+                <div v-if="showMobileMenu" class="fixed inset-0 z-40 bg-transparent" @click="showMobileMenu = false"></div>
             </div>
         </nav>
 
@@ -153,8 +202,8 @@
                     </div>
                 </div>
 
-                <!-- 全域版型庫管理 -->
-                <div class="mt-12 border-t pt-8">
+                <!-- 全域版型庫管理 (Desktop: In-flow, Mobile: Hidden/In Drawer) -->
+                <div class="mt-12 border-t pt-8 hidden md:block">
                     <h2 class="text-xl font-bold mb-4">🌍 全域版型庫 (Global Library)</h2>
                     <div class="bg-white p-4 rounded shadow overflow-auto">
                         <table class="w-full text-left">
@@ -198,11 +247,49 @@
             </div>
         </div>
 
-        <!-- 2. 編輯器視圖 (Workspace) -->
-        <div v-if="currentView === 'editor' && currentProject" class="flex flex-1 overflow-hidden no-print">
+        <!-- Mobile Project Sidebar (Global Library) -->
+        <div v-if="currentView === 'projects'" 
+             class="fixed inset-y-0 left-0 w-80 max-w-full bg-white border-r flex flex-col z-[2000] transform transition-transform duration-300 md:hidden"
+             :class="showLeftSidebar ? 'translate-x-0 shadow-2xl' : '-translate-x-full'">
             
+            <div class="flex items-center justify-between p-2 border-b bg-gray-50">
+                <span class="font-bold text-gray-700 ml-2">全域版型庫</span>
+                <button class="p-2 text-gray-500 hover:text-gray-800 bg-white rounded-full shadow" @click="showLeftSidebar = false">✕</button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4">
+                 <div class="space-y-4">
+                    <div v-for="(type, index) in globalLibrary" :key="type.id" class="bg-white border rounded p-3 shadow-sm relative">
+                        <div class="flex justify-between items-start mb-1">
+                            <h4 class="font-bold text-gray-800">{{ type.name }}</h4>
+                            <button @click="deleteGlobalType(index)" class="text-red-400">🗑️</button>
+                        </div>
+                        <div class="text-xs text-gray-500 mb-2">
+                             {{ type.width || 63 }}x{{ type.height || 88 }}mm • {{ type.elements.length }} 元素<br>
+                             來源: {{ type.sourceProject || '-' }}
+                        </div>
+                    </div>
+                    <div v-if="globalLibrary.length === 0" class="text-center text-gray-400 py-4">尚無儲存的版型</div>
+                 </div>
+            </div>
+        </div>
+
+        <!-- 2. 編輯器視圖 (Workspace) -->
+        <div v-if="currentView === 'editor' && currentProject" class="flex flex-col md:flex-row flex-1 overflow-hidden no-print relative">
+            
+            <!-- Mobile Backdrop for Left Sidebar -->
+            <div v-if="showLeftSidebar" class="fixed inset-0 bg-black/50 z-[1990] md:hidden transition-opacity" @click="showLeftSidebar = false"></div>
+
             <!-- 左側：側邊欄 (卡片/版型) -->
-            <div class="w-64 bg-white border-r flex flex-col z-10">
+            <div class="fixed inset-y-0 left-0 w-80 max-w-full bg-white border-r flex flex-col z-[2000] transform transition-transform duration-300 md:relative md:w-64 md:translate-x-0"
+                 :class="showLeftSidebar ? 'translate-x-0 shadow-2xl' : '-translate-x-full md:shadow-none'">
+                
+                <!-- Mobile Header with Close Button -->
+                <div class="flex items-center justify-between p-2 border-b md:hidden bg-gray-50">
+                    <span class="font-bold text-gray-700 ml-2">選單</span>
+                    <button class="p-2 text-gray-500 hover:text-gray-800 bg-white rounded-full shadow" @click="showLeftSidebar = false">✕</button>
+                </div>
+
                 <!-- Tab Switcher -->
                 <div class="flex border-b text-sm">
                     <button 
@@ -210,14 +297,22 @@
                         :class="{'bg-white text-blue-600 border-b-2 border-blue-600': sidebarTab === 'cards', 'bg-gray-50 text-gray-500 hover:bg-gray-100': sidebarTab !== 'cards'}"
                         class="flex-1 py-3 font-bold transition text-center"
                     >
-                        🗂️ 卡片清單
+                        🗂️ 卡片
                     </button>
                     <button 
                         @click="sidebarTab = 'templates'" 
                         :class="{'bg-white text-blue-600 border-b-2 border-blue-600': sidebarTab === 'templates', 'bg-gray-50 text-gray-500 hover:bg-gray-100': sidebarTab !== 'templates'}"
                         class="flex-1 py-3 font-bold transition text-center"
                     >
-                        📐 專案版型
+                        📐 版型
+                    </button>
+                    <!-- Mobile Layer List Tab (Only visible in mobile, or always if moving completely?) User said "put into hamburger", implies it joins the sidebar tabs -->
+                    <button 
+                        @click="sidebarTab = 'layers'" 
+                        :class="{'bg-white text-blue-600 border-b-2 border-blue-600': sidebarTab === 'layers', 'bg-gray-50 text-gray-500 hover:bg-gray-100': sidebarTab !== 'layers'}"
+                        class="flex-1 py-3 font-bold transition text-center md:hidden"
+                    >
+                        📑 圖層
                     </button>
                 </div>
 
@@ -306,50 +401,96 @@
                         </div>
                      </div>
                 </template>
+                <!-- 3. 圖層清單視圖 (Mobile Only in Sidebar) -->
+                <template v-if="sidebarTab === 'layers'">
+                    <div class="flex-1 overflow-y-auto p-2 space-y-1">
+                        <div v-if="!currentCard" class="text-center text-gray-400 mt-10 text-sm">請選擇一張卡片</div>
+                        <template v-else>
+                            <div 
+                                v-for="el in elementList" 
+                                :key="el.id"
+                                class="flex items-center gap-2 p-2 rounded border hover:border-blue-300 transition text-sm group bg-white"
+                                :class="{'bg-blue-50 border-blue-500': selectedElementId === el.id}"
+                                @click="selectCard(currentCard.id); selectedElementId = el.id; showLeftSidebar = false"
+                            >
+                                <!-- Icon -->
+                                <div class="text-xs w-5 text-center flex-shrink-0">
+                                    <span v-if="el.type === 'text'">📝</span>
+                                    <span v-else>
+                                        <div class="w-3 h-3 mx-auto border border-gray-300" :style="{backgroundColor: el.color, borderRadius: el.shapeType === 'circle' ? '50%' : '0'}"></div>
+                                    </span>
+                                </div>
+                                
+                                <!-- Content Preview -->
+                                <div class="flex-1 truncate select-none">
+                                    <span v-if="el.type === 'text'" class="font-medium text-gray-700">{{ el.content || '(空白文字)' }}</span>
+                                    <span v-else class="text-gray-500 capitalize">{{ el.shapeType }}</span>
+                                </div>
+
+                                <!-- Z-Index Badge -->
+                                <div class="text-[10px] text-gray-400 font-mono bg-gray-100 px-1 rounded">
+                                    z:{{ el.z }}
+                                </div>
+
+                                <!-- Actions -->
+                                <div class="flex gap-1 ml-1">
+                                    <button @click.stop="cloneElement(el)" title="複製" class="p-1 hover:bg-blue-100 rounded text-gray-500 hover:text-blue-600">📄</button>
+                                    <button @click.stop="removeElement(el.id)" title="刪除" class="p-1 hover:bg-red-100 rounded text-gray-500 hover:text-red-600">🗑️</button>
+                                </div>
+                            </div>
+                            <div v-if="currentCard.elements.length === 0" class="text-center text-gray-400 text-xs mt-4">
+                                尚無元素
+                            </div>
+                        </template>
+                    </div>
+                </template>
             </div>
 
             <!-- 中間：畫布 (Workspace) -->
-            <div class="flex-1 bg-gray-200 relative overflow-auto flex flex-col items-center justify-center p-8" @click="deselectElement">
+            <div class="flex-1 bg-gray-200 relative flex flex-col overflow-hidden mb-[40vh] md:mb-0" @click="deselectElement">
                 
-                <!-- 工具列 -->
-                <div class="absolute top-4 left-4 flex gap-2 bg-white p-2 rounded shadow-md z-20">
-                    <button @click.stop="addElement('text')" class="flex items-center gap-1 px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded text-sm">📝 文字</button>
-                    <button @click.stop="addElement('shape')" class="flex items-center gap-1 px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded text-sm">⏹️ 形狀</button>
-                    <div class="w-px h-6 bg-gray-300 mx-1"></div>
-                    <div class="relative group">
-                        <button class="flex items-center gap-1 px-3 py-1 bg-purple-100 hover:bg-purple-200 text-purple-800 rounded text-sm font-bold">
-                            🧩 套用版型
-                        </button>
-                        <!-- Dropdown -->
-                        <div class="absolute top-full left-0 w-64 bg-white rounded shadow-xl border hidden group-hover:block z-30">
-                            <div class="p-2 text-xs font-bold text-gray-500 bg-gray-50">全域庫</div>
-                            <div v-for="type in globalLibrary" :key="type.id" @click="applyCardType(type)" class="px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm border-b last:border-0">
-                                <div class="flex justify-between font-bold">
-                                    <span>{{ type.name }}</span>
-                                    <span class="text-xs text-gray-400 font-normal">{{ type.width || 63 }}x{{ type.height || 88 }}mm</span>
+                <!-- 工具列 (Toolbar) -->
+                <div class="w-full p-2 z-20 flex justify-center md:justify-start shrink-0">
+                    <div class="flex gap-2 bg-white p-2 rounded shadow-md">
+                        <button @click.stop="addElement('text')" class="flex items-center gap-1 px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded text-sm">📝 <span class="hidden sm:inline">文字</span></button>
+                        <button @click.stop="addElement('shape')" class="flex items-center gap-1 px-3 py-1 bg-gray-100 hover:bg-gray-200 rounded text-sm">⏹️ <span class="hidden sm:inline">形狀</span></button>
+                        <div class="w-px h-6 bg-gray-300 mx-1"></div>
+                        <div class="relative group">
+                            <button class="flex items-center gap-1 px-3 py-1 bg-purple-100 hover:bg-purple-200 text-purple-800 rounded text-sm font-bold">
+                                🧩 <span class="hidden sm:inline">套用版型</span>
+                            </button>
+                            <!-- Dropdown -->
+                            <div class="absolute top-full left-0 w-64 bg-white rounded shadow-xl border hidden group-hover:block z-30">
+                                <div class="p-2 text-xs font-bold text-gray-500 bg-gray-50">全域庫</div>
+                                <div v-for="type in globalLibrary" :key="type.id" @click="applyCardType(type)" class="px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm border-b last:border-0">
+                                    <div class="flex justify-between font-bold">
+                                        <span>{{ type.name }}</span>
+                                        <span class="text-xs text-gray-400 font-normal">{{ type.width || 63 }}x{{ type.height || 88 }}mm</span>
+                                    </div>
+                                    <div class="text-xs text-gray-400 mt-1 flex justify-between">
+                                        <span>專案: {{ type.sourceProject || '-' }}</span>
+                                        <span>{{ type.elements.length }} 元素</span>
+                                    </div>
                                 </div>
-                                <div class="text-xs text-gray-400 mt-1 flex justify-between">
-                                    <span>專案: {{ type.sourceProject || '-' }}</span>
-                                    <span>{{ type.elements.length }} 元素</span>
+                                <div v-if="globalLibrary.length === 0" class="px-4 py-2 text-gray-400 text-xs italic">無全域版型</div>
+                                
+                                <div class="p-2 text-xs font-bold text-gray-500 bg-gray-50 border-t">專案庫</div>
+                                <div v-for="type in currentProject.localTypes" :key="type.id" @click="applyCardType(type)" class="px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm border-b last:border-0">
+                                    <div class="flex justify-between font-bold">
+                                        <span>{{ type.name }}</span>
+                                        <span class="text-xs text-gray-400 font-normal">{{ type.width || 63 }}x{{ type.height || 88 }}mm</span>
+                                    </div>
+                                    <div class="text-xs text-gray-400 mt-1">{{ type.elements.length }} 元素</div>
                                 </div>
+                                <div v-if="currentProject.localTypes.length === 0" class="px-4 py-2 text-gray-400 text-xs italic">無專案版型</div>
                             </div>
-                            <div v-if="globalLibrary.length === 0" class="px-4 py-2 text-gray-400 text-xs italic">無全域版型</div>
-                            
-                            <div class="p-2 text-xs font-bold text-gray-500 bg-gray-50 border-t">專案庫</div>
-                            <div v-for="type in currentProject.localTypes" :key="type.id" @click="applyCardType(type)" class="px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm border-b last:border-0">
-                                <div class="flex justify-between font-bold">
-                                    <span>{{ type.name }}</span>
-                                    <span class="text-xs text-gray-400 font-normal">{{ type.width || 63 }}x{{ type.height || 88 }}mm</span>
-                                </div>
-                                <div class="text-xs text-gray-400 mt-1">{{ type.elements.length }} 元素</div>
-                            </div>
-                            <div v-if="currentProject.localTypes.length === 0" class="px-4 py-2 text-gray-400 text-xs italic">無專案版型</div>
                         </div>
                     </div>
                 </div>
 
                 <!-- 畫布區域 -->
-                <div v-if="currentCard" class="relative">
+                <div class="flex-1 overflow-auto flex flex-col items-center justify-center p-4 md:p-8">
+                    <div v-if="currentCard" class="relative">
                     <!-- 比例尺標示 -->
                     <div class="absolute -top-6 left-0 text-xs text-gray-500">{{ currentCard.width || 63 }}mm</div>
                     <div class="absolute top-0 -left-8 text-xs text-gray-500 h-full flex items-center" style="writing-mode: vertical-rl;">{{ currentCard.height || 88 }}mm</div>
@@ -364,8 +505,10 @@
                             border: `${currentCard.borderWidth || 0}px solid ${currentCard.borderColor || '#000000'}`
                         }"
                         @mousemove="onMouseMove" 
+                        @touchmove.prevent="onMouseMove"
                         @mouseup="onMouseUp"
                         @mouseleave="onMouseUp"
+                        @touchend="onMouseUp"
                     >
                         <div 
                             v-for="element in currentCard.elements" 
@@ -374,6 +517,7 @@
                             class="absolute cursor-move hover:outline hover:outline-1 hover:outline-blue-300 no-select flex items-center justify-center overflow-hidden"
                             :class="{'element-selected': selectedElementId === element.id}"
                             @mousedown.stop="startDrag($event, element)"
+                            @touchstart.stop="startDrag($event, element)"
                             @dblclick.stop="startTextEditing(element)"
                             @click.stop
                         >
@@ -402,13 +546,29 @@
                     </div>
                 </div>
                 <div v-else class="text-gray-400 text-lg">請選擇或建立一張卡片</div>
+                </div>
 
             </div>
 
             <!-- 右側：屬性檢查器 (Inspector) -->
-            <div class="w-72 bg-white border-l flex flex-col z-10">
+            <!-- Desktop: Standard Sidebar / Mobile: Bottom Sheet Footer -->
+            <div class="fixed inset-x-0 bottom-0 h-[40vh] bg-white border-t flex flex-col z-[45] transform transition-transform duration-300 md:static md:inset-auto md:h-auto md:w-72 md:border-t-0 md:border-l md:translate-y-0"
+                 :class="{'translate-y-0 shadow-[0_-5px_20px_rgba(0,0,0,0.1)]': currentView === 'editor', 'translate-y-full md:translate-y-0': currentView !== 'editor'}"> <!-- Always visible in editor mode on mobile, but styled as footer -->
+                
+                <!-- Mobile Handle / Toggle (Optional if always visible, but maybe collapsible?) -->
+                <!-- Let's make it collapsible on mobile? User said "改在下方footerbar呈現". Usually implies always visible or tabbed.
+                     But if it takes 40vh, it might block view. Let's assume it replaces the previous toolbar.
+                     Wait, if it's properties, it should probably be visible when an element is selected?
+                     Or just always there. Let's keep it simple: A scrollable footer area.
+                -->
+                
+                <!-- Mobile Drag Handle / Header -->
+                <div class="md:hidden flex justify-center items-center py-2 border-b bg-gray-50 cursor-pointer" @click="showMobileInspector = !showMobileInspector">
+                    <div class="w-10 h-1 bg-gray-300 rounded-full"></div>
+                </div>
+
                 <!-- 上半部：屬性編輯區 (可滾動) -->
-                <div class="flex-1 overflow-y-auto min-h-0">
+                <div class="flex-1 overflow-y-auto min-h-0 relative" :class="{'hidden md:block': !showMobileInspector}">
                     <div class="p-4 border-b bg-gray-50 sticky top-0 z-10">
                         <h3 class="font-bold text-gray-700">🎨 屬性檢查器</h3>
                     </div>
@@ -613,8 +773,8 @@
                 </div>
             </div>
 
-            <!-- 下半部：圖層清單 -->
-            <div class="h-1/3 border-t flex flex-col bg-white" v-if="currentCard">
+            <!-- 下半部：圖層清單 (Desktop Only) -->
+            <div class="h-1/3 border-t flex flex-col bg-white hidden md:flex" v-if="currentCard">
                 <div class="p-2 border-b bg-gray-50 text-xs font-bold text-gray-500 flex justify-between items-center">
                     <span>圖層清單 ({{ currentCard.elements.length }})</span>
                 </div>
@@ -656,14 +816,28 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Mobile Bottom Toolbar (Replaced by Inspector Footer, so removing old one) -->
         </div>
     </div>
 
         <!-- 3. 輸出列印視圖 (Print Preview) -->
-        <div v-if="currentView === 'print' && currentProject" class="flex flex-1 overflow-hidden">
-            <!-- 設定側欄 (No Print) -->
-            <div class="w-72 bg-white border-r flex flex-col p-4 overflow-y-auto no-print">
-                <h2 class="text-xl font-bold mb-4">🖨️ 匯出設定</h2>
+        <div v-if="currentView === 'print' && currentProject" class="flex flex-col md:flex-row flex-1 overflow-hidden relative">
+            
+            <!-- Mobile Backdrop -->
+            <div v-if="showLeftSidebar" class="fixed inset-0 bg-black/50 z-[1990] md:hidden transition-opacity" @click="showLeftSidebar = false"></div>
+
+            <!-- 設定側欄 (Desktop: Static Left / Mobile: Inside Drawer via Hamburger) -->
+            <div class="fixed inset-y-0 left-0 w-80 max-w-full bg-white border-r flex flex-col p-4 overflow-y-auto z-[2000] transform transition-transform duration-300 md:relative md:w-72 md:translate-x-0 md:h-full md:z-auto md:shadow-none"
+                 :class="showLeftSidebar ? 'translate-x-0 shadow-2xl' : '-translate-x-full'">
+                
+                <!-- Mobile Header -->
+                <div class="flex items-center justify-between mb-4 pb-2 border-b md:hidden">
+                    <h2 class="text-xl font-bold">🖨️ 匯出設定</h2>
+                    <button class="p-2 text-gray-500 hover:text-gray-800 bg-white rounded-full shadow" @click="showLeftSidebar = false">✕</button>
+                </div>
+
+                <h2 class="text-xl font-bold mb-4 hidden md:block">🖨️ 匯出設定</h2>
                 
                 <div class="mb-6">
                     <button @click="exportToPng" :disabled="isExporting" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 shadow-lg flex justify-center items-center gap-2 disabled:bg-gray-400">
@@ -726,12 +900,12 @@
             </div>
 
             <!-- 預覽區域 (Print Area) -->
-            <div class="flex-1 bg-gray-500 overflow-auto p-8 flex flex-col items-center gap-8">
+            <div class="flex-1 bg-gray-500 overflow-x-hidden overflow-y-auto p-4 md:p-8 flex flex-col items-center gap-8 w-full">
                 <!-- A4 Pages Loop -->
                 <div 
                     v-for="(pageCards, pageIdx) in paginatedCards" 
                     :key="pageIdx"
-                    class="bg-white shadow-2xl p-[5mm] min-h-[297mm] w-[210mm] print-page relative"
+                    class="bg-white shadow-2xl p-[5mm] min-h-[297mm] w-[210mm] print-page relative origin-top transform scale-[0.4] sm:scale-[0.6] md:scale-100 mb-[-160mm] sm:mb-[-100mm] md:mb-0"
                 >
                     <!-- Page Number (Preview Only) -->
                     <div class="absolute -top-6 left-0 text-white text-xs no-print">Page {{ pageIdx + 1 }}</div>
@@ -840,6 +1014,11 @@
                     globalLibrary: [],
                     currentProjectId: null,
                     currentCardId: null,
+                    
+                    // Mobile State
+                    showLeftSidebar: false,
+                    showMobileInspector: true, // Default open on mobile footer
+                    showMobileMenu: false, // New: Toggle for mobile top-right menu
                     
                     // Editor State
                     selectedElementId: null,
@@ -962,6 +1141,19 @@
                 }
             },
             watch: {
+                currentView(newVal) {
+                    // Reset mobile sidebar states on view change
+                    this.showLeftSidebar = false;
+                    this.showMobileInspector = true;
+                    
+                    // Specific logic per view
+                    if (newVal === 'print') {
+                        // "匯出模式預設展開" -> Open Left Sidebar on Mobile
+                        if (window.innerWidth < 768) {
+                            this.showLeftSidebar = true;
+                        }
+                    }
+                },
                 // Auto-save on major changes (debounced in real app, simple here)
                 projects: {
                     handler() { 
@@ -1025,6 +1217,7 @@
                 openProject(id) {
                     this.currentProjectId = id;
                     this.currentView = 'editor';
+                    this.showLeftSidebar = false; // Reset sidebar
                     // Auto select first card or create one if empty
                     if (this.currentProject.cards.length === 0) {
                         this.addNewCard();
@@ -1503,17 +1696,31 @@
                     this.selectedElementId = element.id;
                     this.draggingElementId = element.id;
                     
+                    // Handle Touch or Mouse
+                    const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+                    const clientY = event.touches ? event.touches[0].clientY : event.clientY;
+
                     // Calculate offset
-                    this.dragOffset.x = event.clientX - element.x;
-                    this.dragOffset.y = event.clientY - element.y;
+                    this.dragOffset.x = clientX - element.x;
+                    this.dragOffset.y = clientY - element.y;
                 },
                 onMouseMove(event) {
                     if (this.draggingElementId) {
+                        // Prevent scrolling on touch
+                        if (event.touches) {
+                            // event.preventDefault(); // Might block scrolling of the page? Only do this if we are sure.
+                            // Better not preventDefault on window level unless necessary.
+                            // But for dragging, we usually want to prevent scroll.
+                        }
+
                         const el = this.currentCard.elements.find(e => e.id === this.draggingElementId);
                         if (el) {
+                            const clientX = event.touches ? event.touches[0].clientX : event.clientX;
+                            const clientY = event.touches ? event.touches[0].clientY : event.clientY;
+
                             // Snap to grid could be added here
-                            el.x = event.clientX - this.dragOffset.x;
-                            el.y = event.clientY - this.dragOffset.y;
+                            el.x = clientX - this.dragOffset.x;
+                            el.y = clientY - this.dragOffset.y;
                         }
                     }
                 },
