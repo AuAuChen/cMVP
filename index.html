@@ -120,7 +120,7 @@
                     
                     <div class="flex items-baseline gap-2">
                         <h1 class="text-xl font-bold">cMVP</h1>
-                        <span class="text-xs text-gray-500 font-mono hidden md:inline">v1.4.1</span>
+                        <span class="text-xs text-gray-500 font-mono hidden md:inline">v1.4.2</span>
                         <span v-if="currentProject" class="text-xs text-gray-400 bg-gray-700 px-2 py-0.5 rounded-full truncate max-w-[100px] md:max-w-none hidden sm:inline">
                             {{ currentProject.name }}
                         </span>
@@ -941,11 +941,34 @@
                                     v-for="el in card.elements" 
                                     :key="el.id"
                                     :style="getPrintElementStyle(el)"
-                                    class="absolute flex items-center justify-center overflow-hidden"
+                                    class="absolute flex items-center justify-center"
                                 >
-                                    <span v-if="el.type === 'text'" :style="{ fontSize: scaleVal(el.fontSize) + 'px', color: el.color, textAlign: el.textAlign }" class="w-full whitespace-pre-wrap leading-tight">
+                                    <!-- Text Element -->
+                                    <span v-if="el.type === 'text'" :style="{ fontSize: scaleVal(el.fontSize) + 'px', color: el.color, textAlign: el.textAlign, lineHeight: '1', fontFamily: 'sans-serif' }" class="w-full whitespace-pre-wrap block">
                                         {{ el.content }}
                                     </span>
+
+                                    <!-- SVG Shape Element (For Print/Export Stability) -->
+                                    <svg v-if="el.type === 'shape'" viewBox="0 0 100 100" preserveAspectRatio="none" class="w-full h-full block">
+                                        <!-- Complex Shapes -->
+                                        <polygon 
+                                            v-if="el.shapeType !== 'circle' && el.shapeType !== 'rectangle'" 
+                                            :points="getShapePoints(el.shapeType)" 
+                                            :fill="el.color" 
+                                        />
+                                        <!-- Rectangle -->
+                                        <rect 
+                                            v-if="el.shapeType === 'rectangle'" 
+                                            x="0" y="0" width="100" height="100" 
+                                            :fill="el.color" 
+                                        />
+                                        <!-- Circle -->
+                                        <circle 
+                                            v-if="el.shapeType === 'circle'" 
+                                            cx="50" cy="50" r="50" 
+                                            :fill="el.color" 
+                                        />
+                                    </svg>
                                 </div>
                             </div>
                         </div>
@@ -1613,6 +1636,24 @@
                     
                     return style;
                 },
+                // --- SVG Shape Helpers for Print/Export ---
+                getShapePoints(type) {
+                    switch(type) {
+                        case 'triangle':
+                            return '50,0 0,100 100,100';
+                        case 'triangle-inverted':
+                            return '50,100 0,0 100,0';
+                        case 'star':
+                            return '50,0 61,35 98,35 68,57 79,91 50,70 21,91 32,57 2,35 39,35';
+                        case 'hexagon':
+                            return '25,0 75,0 100,50 75,100 25,100 0,50';
+                        case 'heart':
+                            return '50,85 100,38 82,0 50,25 18,0 0,38';
+                        default:
+                            return '';
+                    }
+                },
+
                 // Conversion for Print (Px to approx mm ratio logic handled by CSS scale or Calc)
                 // Current approach: Editor uses screenScale (3.8px per mm)
                 // Print uses mm directly. So conversion is 1 / screenScale
@@ -1628,34 +1669,8 @@
                         position: 'absolute'
                     };
 
-                    if (el.type === 'shape') {
-                        style.backgroundColor = el.color;
-                        
-                        switch(el.shapeType) {
-                            case 'circle':
-                                style.borderRadius = '50%';
-                                break;
-                            case 'triangle':
-                                style.clipPath = 'polygon(50% 0%, 0% 100%, 100% 100%)';
-                                break;
-                            case 'triangle-inverted':
-                                style.clipPath = 'polygon(50% 100%, 0% 0%, 100% 0%)';
-                                break;
-                            case 'star':
-                                style.clipPath = 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)';
-                                break;
-                            case 'hexagon':
-                                style.clipPath = 'polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)';
-                                break;
-                            case 'heart':
-                                style.clipPath = 'polygon(50% 85%, 100% 38%, 82% 0%, 50% 25%, 18% 0%, 0% 38%)'; 
-                                break;
-                            case 'rectangle':
-                            default:
-                                style.borderRadius = '0';
-                                break;
-                        }
-                    }
+                    // Note: Background color and shape clipping are now handled by SVG in the template
+                    // to ensure compatibility with html2canvas export.
 
                     return style;
                 },
@@ -1847,9 +1862,6 @@
                     // Wait for DOM to be ready just in case
                     await this.$nextTick();
                     
-                    // Small delay to ensure rendering
-                    await new Promise(resolve => setTimeout(resolve, 500));
-
                     const pages = document.querySelectorAll('.print-page');
                     const total = pages.length;
                     
@@ -1860,27 +1872,55 @@
                     }
 
                     try {
+                        // Create a container for clean rendering (off-screen/isolated)
+                        const container = document.createElement('div');
+                        container.style.position = 'fixed';
+                        container.style.top = '0';
+                        container.style.left = '0';
+                        // Use z-index to hide it behind everything but ensure it's rendered in DOM
+                        container.style.zIndex = '-9999'; 
+                        // Ensure container doesn't constrain width
+                        container.style.width = 'auto';
+                        container.style.height = 'auto';
+                        document.body.appendChild(container);
+
                         for (let i = 0; i < total; i++) {
                             this.exportProgress = `${i + 1} / ${total}`;
-                            const page = pages[i];
+                            const originalPage = pages[i];
                             
-                            // Ensure the page is visible in viewport/rendered to avoid blank issues
-                            page.scrollIntoView();
-                            await new Promise(resolve => setTimeout(resolve, 200));
+                            // Clone the page to isolate from view scaling/transforms
+                            const clone = originalPage.cloneNode(true);
+                            
+                            // Force reset styles on the clone to ensure clean A4 layout
+                            // We use !important to override any Tailwind utility classes
+                            clone.style.setProperty('transform', 'none', 'important');
+                            clone.style.setProperty('margin', '0', 'important');
+                            clone.style.setProperty('box-shadow', 'none', 'important');
+                            // Ensure it's positioned relative within our container
+                            clone.style.setProperty('position', 'absolute', 'important');
+                            clone.style.setProperty('top', '0', 'important');
+                            clone.style.setProperty('left', '0', 'important');
+                            
+                            // Append clone to container
+                            container.innerHTML = '';
+                            container.appendChild(clone);
+                            
+                            // Small delay to allow layout to settle
+                            await new Promise(resolve => setTimeout(resolve, 50));
 
-                            // Use html2canvas
-                            // Force A4 @ 300 PPI size: 2480px x 3508px
+                            // Calculate scale for 300 PPI (A4 width 2480px)
+                            // The clone is sized in mm (210mm). In DOM (96dpi), that's approx 793px.
+                            const originalWidth = clone.offsetWidth || 793;
                             const targetWidth = 2480;
-                            const originalWidth = page.offsetWidth || 793; // Fallback width
                             const scaleFactor = targetWidth / originalWidth;
 
-                            const canvas = await html2canvas(page, {
+                            const canvas = await html2canvas(clone, {
                                 scale: scaleFactor, 
                                 backgroundColor: '#ffffff',
                                 useCORS: true, 
                                 logging: false,
                                 scrollX: 0,
-                                scrollY: -window.scrollY // Fix for scrolled content
+                                scrollY: 0
                             });
 
                             // Download
@@ -1889,6 +1929,10 @@
                             link.href = canvas.toDataURL('image/png');
                             link.click();
                         }
+                        
+                        // Cleanup
+                        document.body.removeChild(container);
+
                     } catch (err) {
                         console.error(err);
                         alert("圖片匯出失敗: " + err.message);
