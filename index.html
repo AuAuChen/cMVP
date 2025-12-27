@@ -119,8 +119,8 @@
                     </button>
                     
                     <div class="flex items-baseline gap-2">
-                        <h1 class="text-xl font-bold">cMVP</h1>
-                        <span class="text-xs text-gray-500 font-mono hidden md:inline">v1.5.11</span>
+                        <h1 class="text-xl font-bold cursor-pointer hover:text-gray-300 transition" @click="currentView = 'projects'">cMVP</h1>
+                        <span class="text-xs text-gray-500 font-mono hidden md:inline">v1.5.13</span>
                         <span v-if="currentProject" class="text-xs text-gray-400 bg-gray-700 px-2 py-0.5 rounded-full truncate max-w-[100px] md:max-w-none hidden sm:inline">
                             {{ currentProject.name }}
                         </span>
@@ -130,9 +130,6 @@
 
             <!-- Center: View Switcher (Scrollable on mobile) -->
             <div class="flex gap-2 text-sm overflow-x-auto pb-1 md:pb-0 px-2 flex-1 justify-center md:justify-start scrollbar-hide">
-                <button @click="currentView = 'projects'" :class="{'bg-gray-600': currentView === 'projects'}" class="whitespace-nowrap px-3 py-1 rounded hover:bg-gray-700 transition flex items-center gap-1 shrink-0">
-                    <span>📂</span> <span class="hidden md:inline">專案列表</span>
-                </button>
                 <button v-if="currentProject" @click="currentView = 'editor'" :class="{'bg-gray-600': currentView === 'editor'}" class="whitespace-nowrap px-3 py-1 rounded hover:bg-gray-700 transition flex items-center gap-1 shrink-0">
                     <span>✏️</span> <span class="hidden md:inline">卡片編輯</span>
                 </button>
