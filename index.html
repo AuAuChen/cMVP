@@ -120,7 +120,7 @@
                     
                     <div class="flex items-baseline gap-2">
                         <h1 class="text-xl font-bold">cMVP</h1>
-                        <span class="text-xs text-gray-500 font-mono hidden md:inline">v1.5.9</span>
+                        <span class="text-xs text-gray-500 font-mono hidden md:inline">v1.5.10</span>
                         <span v-if="currentProject" class="text-xs text-gray-400 bg-gray-700 px-2 py-0.5 rounded-full truncate max-w-[100px] md:max-w-none hidden sm:inline">
                             {{ currentProject.name }}
                         </span>
@@ -596,13 +596,15 @@
                  :class="{
                     'translate-y-0': currentView === 'editor', 
                     'translate-y-full md:translate-y-0': currentView !== 'editor',
-                    'bg-transparent pointer-events-none': isMobile && !mobileInspectorTab, 
-                    'bg-white pointer-events-auto shadow-[0_-5px_20px_rgba(0,0,0,0.1)]': !isMobile || mobileInspectorTab
+                   'bg-transparent pointer-events-none': isMobile && !mobileInspectorTab, 
+                   'pointer-events-auto': isMobile && mobileInspectorTab,
+                   'bg-white pointer-events-auto shadow-[0_-5px_20px_rgba(0,0,0,0.1)]': !isMobile
                  }">
                 
                 <!-- Mobile: Expanded Content Area (Pushes up from bottom) -->
                 <!-- Only show if mobileInspectorTab is active OR on Desktop -->
-                <div class="flex-1 overflow-y-auto min-h-0 relative bg-white pointer-events-auto w-full md:block" 
+                <div class="flex-1 overflow-y-auto min-h-0 relative pointer-events-auto w-full md:block md:bg-white" 
+                     :style="isMobile ? { backgroundColor: 'rgba(255, 255, 255, 0.65)', backdropFilter: 'blur(5px)' } : {}"
                      v-if="!isMobile || mobileInspectorTab"
                      :class="{'border-t shadow-lg max-h-[50vh]': isMobile}"
                      @touchstart.stop @touchmove.stop
