@@ -120,7 +120,7 @@
                     
                     <div class="flex items-baseline gap-2">
                         <h1 class="text-xl font-bold">cMVP</h1>
-                        <span class="text-xs text-gray-500 font-mono hidden md:inline">v1.5.2</span>
+                        <span class="text-xs text-gray-500 font-mono hidden md:inline">v1.5.9</span>
                         <span v-if="currentProject" class="text-xs text-gray-400 bg-gray-700 px-2 py-0.5 rounded-full truncate max-w-[100px] md:max-w-none hidden sm:inline">
                             {{ currentProject.name }}
                         </span>
@@ -447,7 +447,7 @@
             </div>
 
             <!-- 中間：畫布 (Workspace) -->
-            <div class="flex-1 bg-gray-200 relative flex flex-col overflow-hidden mb-[40vh] md:mb-0" @click="deselectElement">
+            <div class="flex-1 bg-gray-200 relative flex flex-col overflow-hidden" @click="deselectElement">
                 
                 <!-- 工具列 (Toolbar) -->
                 <div class="w-full p-2 z-20 flex justify-center md:justify-start shrink-0">
@@ -590,316 +590,262 @@
                 </div>
 
             <!-- 右側：屬性檢查器 (Inspector) -->
-            <!-- Desktop: Standard Sidebar / Mobile: Bottom Sheet Footer -->
-            <div class="fixed inset-x-0 bottom-0 h-[40vh] bg-white border-t flex flex-col z-[45] transform transition-transform duration-300 md:static md:inset-auto md:h-auto md:w-72 md:border-t-0 md:border-l md:translate-y-0"
-                 :class="{'translate-y-0 shadow-[0_-5px_20px_rgba(0,0,0,0.1)]': currentView === 'editor', 'translate-y-full md:translate-y-0': currentView !== 'editor'}"> <!-- Always visible in editor mode on mobile, but styled as footer -->
+            <!-- Desktop: Standard Sidebar / Mobile: Footer Bar + Expanded Area -->
+            <div class="fixed inset-x-0 bottom-0 z-[45] flex flex-col md:static md:h-auto md:w-72 md:border-l md:bg-white transition-transform duration-300"
+                 :style="isMobile && !mobileInspectorTab ? { height: '3.5rem' } : {}"
+                 :class="{
+                    'translate-y-0': currentView === 'editor', 
+                    'translate-y-full md:translate-y-0': currentView !== 'editor',
+                    'bg-transparent pointer-events-none': isMobile && !mobileInspectorTab, 
+                    'bg-white pointer-events-auto shadow-[0_-5px_20px_rgba(0,0,0,0.1)]': !isMobile || mobileInspectorTab
+                 }">
                 
-                <!-- Mobile Handle / Toggle (Optional if always visible, but maybe collapsible?) -->
-                <!-- Let's make it collapsible on mobile? User said "改在下方footerbar呈現". Usually implies always visible or tabbed.
-                     But if it takes 40vh, it might block view. Let's assume it replaces the previous toolbar.
-                     Wait, if it's properties, it should probably be visible when an element is selected?
-                     Or just always there. Let's keep it simple: A scrollable footer area.
-                -->
-                
-                <!-- Mobile Drag Handle / Header -->
-                <div class="md:hidden flex justify-center items-center py-2 border-b bg-gray-50 cursor-pointer" @click="showMobileInspector = !showMobileInspector">
-                    <div class="w-10 h-1 bg-gray-300 rounded-full"></div>
-                </div>
-
-                <!-- 上半部：屬性編輯區 (可滾動) -->
-                <div class="flex-1 overflow-y-auto min-h-0 relative" :class="{'hidden md:block': !showMobileInspector}" @touchstart.stop @touchmove.stop>
-                    <div class="p-4 border-b bg-gray-50 sticky top-0 z-10">
+                <!-- Mobile: Expanded Content Area (Pushes up from bottom) -->
+                <!-- Only show if mobileInspectorTab is active OR on Desktop -->
+                <div class="flex-1 overflow-y-auto min-h-0 relative bg-white pointer-events-auto w-full md:block" 
+                     v-if="!isMobile || mobileInspectorTab"
+                     :class="{'border-t shadow-lg max-h-[50vh]': isMobile}"
+                     @touchstart.stop @touchmove.stop
+                >
+                    <!-- Header (Desktop Only) -->
+                    <div class="p-4 border-b bg-gray-50 sticky top-0 z-10 hidden md:block">
                         <h3 class="font-bold text-gray-700">🎨 屬性檢查器</h3>
                     </div>
 
                     <div v-if="selectedElement" class="p-4 space-y-4">
-                    <!-- 通用屬性 -->
-                    <div>
-                        <label class="text-xs font-bold text-gray-500 block mb-1">位置與尺寸 (px)</label>
-                        
-                        <!-- X & Y Inputs and Sliders -->
-                        <div class="mb-4 space-y-2">
-                             <div class="flex items-center gap-2">
-                                <span class="text-xs text-gray-400 w-3 font-bold">X</span>
-                                <input type="number" v-model.number="selectedElement.x" class="w-16 border rounded px-2 py-1 text-sm">
-                                <input type="range" v-model.number="selectedElement.x" min="-100" :max="(currentCard.width || 63) * screenScale + 50" class="flex-1 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer">
-                             </div>
-                             <div class="flex items-center gap-2">
-                                <span class="text-xs text-gray-400 w-3 font-bold">Y</span>
-                                <input type="number" v-model.number="selectedElement.y" class="w-16 border rounded px-2 py-1 text-sm">
-                                <input type="range" v-model.number="selectedElement.y" min="-100" :max="(currentCard.height || 88) * screenScale + 50" class="flex-1 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer">
-                             </div>
-                        </div>
-
-                        <!-- W & H Inputs and Sliders -->
-                        <div class="mb-2 space-y-2 border-t pt-2">
-                             <div class="flex items-center gap-2">
-                                <span class="text-xs text-gray-400 w-3 font-bold">W</span>
-                                <input type="number" v-model.number="selectedElement.w" class="w-16 border rounded px-2 py-1 text-sm">
-                                <input type="range" v-model.number="selectedElement.w" min="10" :max="(currentCard.width || 63) * screenScale" class="flex-1 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer">
-                             </div>
-                             <div class="flex items-center gap-2">
-                                <span class="text-xs text-gray-400 w-3 font-bold">H</span>
-                                <input type="number" v-model.number="selectedElement.h" class="w-16 border rounded px-2 py-1 text-sm">
-                                <input type="range" v-model.number="selectedElement.h" min="10" :max="(currentCard.height || 88) * screenScale" class="flex-1 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer">
-                             </div>
-                        </div>
-
-                        <!-- Rotation Input -->
-                        <div class="mb-2 space-y-2 border-t pt-2">
-                             <div class="flex items-center gap-2">
-                                <span class="text-xs text-gray-400 w-3 font-bold">R</span>
-                                <input type="number" v-model.number="selectedElement.rotation" class="w-16 border rounded px-2 py-1 text-sm" placeholder="0">
-                                <input type="range" v-model.number="selectedElement.rotation" min="0" max="360" class="flex-1 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer">
-                             </div>
-                        </div>
-
-                        <div class="grid grid-cols-6 gap-1 mt-2">
-                             <button @click="alignElement('left')" title="置左" class="bg-gray-100 hover:bg-gray-200 border rounded p-1 text-xs font-mono">|&lt;</button>
-                             <button @click="alignElement('center-h')" title="水平置中" class="bg-gray-100 hover:bg-gray-200 border rounded p-1 text-xs font-mono">&gt;|&lt;</button>
-                             <button @click="alignElement('right')" title="置右" class="bg-gray-100 hover:bg-gray-200 border rounded p-1 text-xs font-mono">&gt;|</button>
-                             <button @click="alignElement('top')" title="置頂" class="bg-gray-100 hover:bg-gray-200 border rounded p-1 text-xs font-mono">T</button>
-                             <button @click="alignElement('center-v')" title="垂直置中" class="bg-gray-100 hover:bg-gray-200 border rounded p-1 text-xs font-mono">M</button>
-                             <button @click="alignElement('bottom')" title="置底" class="bg-gray-100 hover:bg-gray-200 border rounded p-1 text-xs font-mono">B</button>
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="text-xs font-bold text-gray-500 block mb-1">層級 (Z-Index)</label>
-                        <div class="flex gap-2 items-center">
-                            <div class="flex border rounded overflow-hidden flex-1 h-9">
-                                <button @click="bringToFront" class="flex-1 bg-gray-50 hover:bg-gray-100 border-r text-xs font-bold flex items-center justify-center gap-1" title="移至最上層">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"></polyline></svg>
-                                    置頂
-                                </button>
-                                <button @click="sendToBack" class="flex-1 bg-gray-50 hover:bg-gray-100 text-xs font-bold flex items-center justify-center gap-1" title="移至最下層">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-                                    置底
-                                </button>
-                            </div>
-                            <input type="number" v-model.number="selectedElement.z" min="0" max="100" class="w-20 border rounded px-2 py-2 text-sm text-center h-9" title="手動輸入層級">
-                        </div>
-                    </div>
-
-                    <!-- 形狀專屬 -->
-                    <div v-if="selectedElement.type === 'shape'">
-                        <label class="text-xs font-bold text-gray-500 block mb-1">樣式</label>
-                        <div class="space-y-4">
-                            <color-picker v-model="selectedElement.color" label="填滿顏色"></color-picker>
+                        <!-- Layout Tab: Position, Size, Rotation, Alignment, Z-Index -->
+                        <div v-show="!isMobile || mobileInspectorTab === 'layout'">
+                            <label class="text-xs font-bold text-gray-500 block mb-1">位置與尺寸 (px)</label>
                             
-                            <!-- Stroke Controls -->
-                            <div class="border-t pt-2 mt-2">
-                                <span class="text-xs font-bold text-gray-500 block mb-2">線條 (Stroke)</span>
-                                <color-picker v-model="selectedElement.strokeColor" label="線條顏色"></color-picker>
+                            <!-- X & Y -->
+                            <div class="mb-4 space-y-2">
+                                 <div class="flex items-center gap-2">
+                                    <span class="text-xs text-gray-400 w-3 font-bold">X</span>
+                                    <input type="number" v-model.number="selectedElement.x" class="w-16 border rounded px-2 py-1 text-sm">
+                                    <input type="range" v-model.number="selectedElement.x" min="-100" :max="(currentCard.width || 63) * screenScale + 50" class="flex-1 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                                 </div>
+                                 <div class="flex items-center gap-2">
+                                    <span class="text-xs text-gray-400 w-3 font-bold">Y</span>
+                                    <input type="number" v-model.number="selectedElement.y" class="w-16 border rounded px-2 py-1 text-sm">
+                                    <input type="range" v-model.number="selectedElement.y" min="-100" :max="(currentCard.height || 88) * screenScale + 50" class="flex-1 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                                 </div>
+                            </div>
+
+                            <!-- W & H -->
+                            <div class="mb-2 space-y-2 border-t pt-2">
+                                 <div class="flex items-center gap-2">
+                                    <span class="text-xs text-gray-400 w-3 font-bold">W</span>
+                                    <input type="number" v-model.number="selectedElement.w" class="w-16 border rounded px-2 py-1 text-sm">
+                                    <input type="range" v-model.number="selectedElement.w" min="10" :max="(currentCard.width || 63) * screenScale" class="flex-1 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                                 </div>
+                                 <div class="flex items-center gap-2">
+                                    <span class="text-xs text-gray-400 w-3 font-bold">H</span>
+                                    <input type="number" v-model.number="selectedElement.h" class="w-16 border rounded px-2 py-1 text-sm">
+                                    <input type="range" v-model.number="selectedElement.h" min="10" :max="(currentCard.height || 88) * screenScale" class="flex-1 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                                 </div>
+                            </div>
+
+                            <!-- Rotation -->
+                            <div class="mb-2 space-y-2 border-t pt-2">
+                                 <div class="flex items-center gap-2">
+                                    <span class="text-xs text-gray-400 w-3 font-bold">R</span>
+                                    <input type="number" v-model.number="selectedElement.rotation" class="w-16 border rounded px-2 py-1 text-sm" placeholder="0">
+                                    <input type="range" v-model.number="selectedElement.rotation" min="0" max="360" class="flex-1 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                                 </div>
+                            </div>
+
+                            <!-- Alignment -->
+                            <div class="grid grid-cols-6 gap-1 mt-2">
+                                 <button @click="alignElement('left')" title="置左" class="bg-gray-100 hover:bg-gray-200 border rounded p-1 text-xs font-mono">|&lt;</button>
+                                 <button @click="alignElement('center-h')" title="水平置中" class="bg-gray-100 hover:bg-gray-200 border rounded p-1 text-xs font-mono">&gt;|&lt;</button>
+                                 <button @click="alignElement('right')" title="置右" class="bg-gray-100 hover:bg-gray-200 border rounded p-1 text-xs font-mono">&gt;|</button>
+                                 <button @click="alignElement('top')" title="置頂" class="bg-gray-100 hover:bg-gray-200 border rounded p-1 text-xs font-mono">T</button>
+                                 <button @click="alignElement('center-v')" title="垂直置中" class="bg-gray-100 hover:bg-gray-200 border rounded p-1 text-xs font-mono">M</button>
+                                 <button @click="alignElement('bottom')" title="置底" class="bg-gray-100 hover:bg-gray-200 border rounded p-1 text-xs font-mono">B</button>
+                            </div>
+
+                            <!-- Z-Index -->
+                            <div class="mt-4 border-t pt-2">
+                                <label class="text-xs font-bold text-gray-500 block mb-1">層級 (Z-Index)</label>
+                                <div class="flex gap-2 items-center">
+                                    <div class="flex border rounded overflow-hidden flex-1 h-9">
+                                        <button @click="bringToFront" class="flex-1 bg-gray-50 hover:bg-gray-100 border-r text-xs font-bold flex items-center justify-center gap-1">置頂</button>
+                                        <button @click="sendToBack" class="flex-1 bg-gray-50 hover:bg-gray-100 text-xs font-bold flex items-center justify-center gap-1">置底</button>
+                                    </div>
+                                    <input type="number" v-model.number="selectedElement.z" min="0" max="100" class="w-20 border rounded px-2 py-2 text-sm text-center h-9">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Style Tab: Colors, Strokes -->
+                        <div v-show="!isMobile || mobileInspectorTab === 'style'">
+                            <label class="text-xs font-bold text-gray-500 block mb-1">樣式</label>
+                            <div class="space-y-4">
+                                <color-picker v-if="selectedElement.type === 'shape' || selectedElement.type === 'text'" v-model="selectedElement.color" :label="selectedElement.type === 'text' ? '文字顏色' : '填滿顏色'"></color-picker>
                                 
-                                <div class="mt-2 flex items-center gap-2">
-                                    <span class="text-xs text-gray-400">寬度</span>
-                                    <input type="number" v-model.number="selectedElement.strokeWidth" min="0" max="20" class="w-16 border rounded px-2 py-1 text-sm text-center" placeholder="0">
-                                    <div class="flex border rounded overflow-hidden">
-                                        <button @click="selectedElement.strokeWidth = 1" class="px-3 py-1 bg-white hover:bg-gray-100 border-r text-xs font-medium text-gray-600 transition">1</button>
-                                        <button @click="selectedElement.strokeWidth = 2" class="px-3 py-1 bg-white hover:bg-gray-100 border-r text-xs font-medium text-gray-600 transition">2</button>
-                                        <button @click="selectedElement.strokeWidth = 5" class="px-3 py-1 bg-white hover:bg-gray-100 text-xs font-medium text-gray-600 transition">5</button>
+                                <div v-if="selectedElement.type === 'shape'" class="border-t pt-2 mt-2">
+                                    <span class="text-xs font-bold text-gray-500 block mb-2">線條 (Stroke)</span>
+                                    <color-picker v-model="selectedElement.strokeColor" label="線條顏色"></color-picker>
+                                    <div class="mt-2 flex items-center gap-2">
+                                        <span class="text-xs text-gray-400">寬度</span>
+                                        <input type="number" v-model.number="selectedElement.strokeWidth" min="0" max="20" class="w-16 border rounded px-2 py-1 text-sm text-center">
+                                        <div class="flex border rounded overflow-hidden">
+                                            <button @click="selectedElement.strokeWidth = 1" class="px-3 py-1 bg-white hover:bg-gray-100 border-r text-xs font-medium text-gray-600 transition">1</button>
+                                            <button @click="selectedElement.strokeWidth = 2" class="px-3 py-1 bg-white hover:bg-gray-100 border-r text-xs font-medium text-gray-600 transition">2</button>
+                                            <button @click="selectedElement.strokeWidth = 5" class="px-3 py-1 bg-white hover:bg-gray-100 text-xs font-medium text-gray-600 transition">5</button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
+                        </div>
 
-                            <div>
+                        <!-- Content Tab: Text Content, Font, Shape Type -->
+                        <div v-show="!isMobile || mobileInspectorTab === 'content'">
+                            <div v-if="selectedElement.type === 'text'">
+                                <label class="text-xs font-bold text-gray-500 block mb-1">內容與文字</label>
+                                <div class="relative mb-2">
+                                     <textarea v-model="selectedElement.content" rows="3" class="w-full border rounded p-2 text-sm pb-8" placeholder="輸入文字..."></textarea>
+                                     <button @click="showEmojiPicker = !showEmojiPicker" class="absolute bottom-2 right-2 text-gray-400 hover:text-gray-600 bg-white hover:bg-gray-50 rounded p-1 border shadow-sm transition-colors">😀</button>
+                                     <div v-if="showEmojiPicker" class="absolute z-50 top-full right-0 mt-1 w-64 h-48 bg-white border shadow-xl rounded-lg p-2 overflow-y-auto grid grid-cols-6 gap-1">
+                                         <button v-for="emoji in emojiList" :key="emoji" @click="selectedElement.content += emoji" class="text-xl hover:bg-gray-100 rounded p-1">{{ emoji }}</button>
+                                     </div>
+                                </div>
+                                <div class="mb-4">
+                                    <span class="text-xs text-gray-400 block mb-1">字體大小 & 對齊</span>
+                                    <div class="flex gap-2 items-center">
+                                        <input type="number" v-model.number="selectedElement.fontSize" class="w-20 border rounded px-2 py-2 text-sm text-center">
+                                        <div class="flex border rounded overflow-hidden flex-1 h-9">
+                                            <button @click="selectedElement.textAlign = 'left'" :class="{'bg-gray-200': selectedElement.textAlign === 'left'}" class="flex-1 hover:bg-gray-100 border-r flex justify-center items-center">L</button>
+                                            <button @click="selectedElement.textAlign = 'center'" :class="{'bg-gray-200': selectedElement.textAlign === 'center'}" class="flex-1 hover:bg-gray-100 border-r flex justify-center items-center">C</button>
+                                            <button @click="selectedElement.textAlign = 'right'" :class="{'bg-gray-200': selectedElement.textAlign === 'right'}" class="flex-1 hover:bg-gray-100 flex justify-center items-center">R</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div v-if="selectedElement.type === 'shape'">
                                 <span class="text-xs text-gray-400 block mb-1">形狀選擇</span>
                                 <div class="grid grid-cols-4 gap-2">
-                                    <button @click="selectedElement.shapeType = 'rectangle'" :class="{'bg-blue-100 border-blue-500': !selectedElement.shapeType || selectedElement.shapeType === 'rectangle'}" class="border rounded p-1 hover:bg-gray-100 flex items-center justify-center h-8" title="矩形">
-                                        <div class="w-4 h-4 bg-gray-600"></div>
-                                    </button>
-                                    <button @click="selectedElement.shapeType = 'circle'" :class="{'bg-blue-100 border-blue-500': selectedElement.shapeType === 'circle'}" class="border rounded p-1 hover:bg-gray-100 flex items-center justify-center h-8" title="圓形">
-                                        <div class="w-4 h-4 bg-gray-600 rounded-full"></div>
-                                    </button>
-                                    <button @click="selectedElement.shapeType = 'triangle'" :class="{'bg-blue-100 border-blue-500': selectedElement.shapeType === 'triangle'}" class="border rounded p-1 hover:bg-gray-100 flex items-center justify-center h-8" title="三角形">
-                                        <div class="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[14px] border-b-gray-600"></div>
-                                    </button>
-                                    <button @click="selectedElement.shapeType = 'triangle-inverted'" :class="{'bg-blue-100 border-blue-500': selectedElement.shapeType === 'triangle-inverted'}" class="border rounded p-1 hover:bg-gray-100 flex items-center justify-center h-8" title="倒三角形">
-                                        <div class="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[14px] border-t-gray-600"></div>
-                                    </button>
-                                    <button @click="selectedElement.shapeType = 'star'" :class="{'bg-blue-100 border-blue-500': selectedElement.shapeType === 'star'}" class="border rounded p-1 hover:bg-gray-100 flex items-center justify-center h-8" title="星形">
-                                        <div class="w-4 h-4 bg-gray-600" style="clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);"></div>
-                                    </button>
-                                    <button @click="selectedElement.shapeType = 'hexagon'" :class="{'bg-blue-100 border-blue-500': selectedElement.shapeType === 'hexagon'}" class="border rounded p-1 hover:bg-gray-100 flex items-center justify-center h-8" title="六邊形">
-                                        <div class="w-4 h-4 bg-gray-600" style="clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);"></div>
-                                    </button>
-                                    <button @click="selectedElement.shapeType = 'heart'" :class="{'bg-blue-100 border-blue-500': selectedElement.shapeType === 'heart'}" class="border rounded p-1 hover:bg-gray-100 flex items-center justify-center h-8" title="愛心">
-                                        <div class="w-4 h-4 bg-gray-600" style="clip-path: polygon(50% 85%, 100% 38%, 82% 0%, 50% 25%, 18% 0%, 0% 38%);"></div>
-                                    </button>
+                                    <button @click="selectedElement.shapeType = 'rectangle'" :class="{'bg-blue-100 border-blue-500': selectedElement.shapeType === 'rectangle'}" class="border rounded p-1 h-8 flex justify-center items-center"><div class="w-4 h-4 bg-gray-600"></div></button>
+                                    <button @click="selectedElement.shapeType = 'circle'" :class="{'bg-blue-100 border-blue-500': selectedElement.shapeType === 'circle'}" class="border rounded p-1 h-8 flex justify-center items-center"><div class="w-4 h-4 bg-gray-600 rounded-full"></div></button>
+                                    <button @click="selectedElement.shapeType = 'triangle'" :class="{'bg-blue-100 border-blue-500': selectedElement.shapeType === 'triangle'}" class="border rounded p-1 h-8 flex justify-center items-center">▲</button>
+                                    <button @click="selectedElement.shapeType = 'triangle-inverted'" :class="{'bg-blue-100 border-blue-500': selectedElement.shapeType === 'triangle-inverted'}" class="border rounded p-1 h-8 flex justify-center items-center">▼</button>
+                                    <button @click="selectedElement.shapeType = 'star'" :class="{'bg-blue-100 border-blue-500': selectedElement.shapeType === 'star'}" class="border rounded p-1 h-8 flex justify-center items-center">★</button>
+                                    <button @click="selectedElement.shapeType = 'hexagon'" :class="{'bg-blue-100 border-blue-500': selectedElement.shapeType === 'hexagon'}" class="border rounded p-1 h-8 flex justify-center items-center">⬡</button>
+                                    <button @click="selectedElement.shapeType = 'heart'" :class="{'bg-blue-100 border-blue-500': selectedElement.shapeType === 'heart'}" class="border rounded p-1 h-8 flex justify-center items-center">♥</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div v-else-if="currentCard" class="p-4 space-y-4">
+                        <!-- Card Layout -->
+                        <div v-show="!isMobile || mobileInspectorTab === 'card-layout'">
+                            <label class="text-xs font-bold text-gray-500 block mb-1">卡片尺寸與方向</label>
+                            <div class="flex gap-2 mb-2">
+                                 <button @click="setCardOrientation('portrait')" :class="{'bg-blue-100 border-blue-500 text-blue-700': isPortrait, 'bg-gray-50 hover:bg-gray-100': !isPortrait}" class="flex-1 border rounded py-2 text-xs font-bold">直式</button>
+                                 <button @click="setCardOrientation('landscape')" :class="{'bg-blue-100 border-blue-500 text-blue-700': !isPortrait, 'bg-gray-50 hover:bg-gray-100': isPortrait}" class="flex-1 border rounded py-2 text-xs font-bold">橫式</button>
+                            </div>
+                            <div class="flex items-center gap-2 text-xs text-gray-500 justify-center">
+                                {{ currentCard.width || 63 }} x {{ currentCard.height || 88 }} mm
+                            </div>
+                        </div>
+
+                        <!-- Card Style -->
+                        <div v-show="!isMobile || mobileInspectorTab === 'card-style'" class="space-y-4">
+                            <!-- Wrapper for margin -->
+                            <div>
+                                <label class="text-xs font-bold text-gray-500 block">卡片外觀</label>
+                                <color-picker v-model="currentCard.bgColor" label="背景顏色"></color-picker>
+                                <color-picker v-model="currentCard.borderColor" label="外框顏色"></color-picker>
+                                <div>
+                                    <span class="text-xs font-bold text-gray-500 block mb-1">外框寬度</span>
+                                    <div class="flex items-center gap-2">
+                                        <input type="number" v-model.number="currentCard.borderWidth" min="0" max="20" class="w-16 border rounded px-2 py-1 text-sm text-center">
+                                        <div class="flex border rounded overflow-hidden">
+                                            <button @click="currentCard.borderWidth = 1" class="px-3 py-1 bg-white hover:bg-gray-100 border-r text-xs font-medium">1</button>
+                                            <button @click="currentCard.borderWidth = 2" class="px-3 py-1 bg-white hover:bg-gray-100 border-r text-xs font-medium">2</button>
+                                            <button @click="currentCard.borderWidth = 5" class="px-3 py-1 bg-white hover:bg-gray-100 text-xs font-medium">5</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Save as Template (Always show on desktop, maybe put in settings tab on mobile?) -->
+                        <div class="pt-4 border-t" v-show="!isMobile || mobileInspectorTab === 'card-layout'">
+                            <h4 class="font-bold text-sm mb-2">📥 另存為版型</h4>
+                            <p class="text-xs text-gray-500 mb-2">將目前的佈局儲存為範本。</p>
+                            <div class="flex flex-col gap-2">
+                                <input type="text" v-model="newTypeName" placeholder="版型名稱..." class="border rounded px-2 py-1 text-sm">
+                                <div class="flex gap-2">
+                                    <button @click="saveAsType('global')" class="flex-1 bg-purple-500 text-white py-1 rounded text-xs hover:bg-purple-600">存入全域庫</button>
+                                    <button @click="saveAsType('local')" class="flex-1 bg-indigo-500 text-white py-1 rounded text-xs hover:bg-indigo-600">存入專案庫</button>
+                                </div>
+                                <div v-if="saveMessage" :class="saveMessageType === 'error' ? 'text-red-500' : 'text-green-600'" class="text-xs text-center font-bold transition-opacity">
+                                    {{ saveMessage }}
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- 文字專屬 -->
-                    <div v-if="selectedElement.type === 'text'">
-                        <label class="text-xs font-bold text-gray-500 block mb-1">內容與文字</label>
-                        <div class="relative mb-2">
-                             <textarea v-model="selectedElement.content" rows="3" class="w-full border rounded p-2 text-sm pb-8" placeholder="輸入文字..."></textarea>
-                             <button @click="showEmojiPicker = !showEmojiPicker" class="absolute bottom-2 right-2 text-gray-400 hover:text-gray-600 bg-white hover:bg-gray-50 rounded p-1 border shadow-sm transition-colors" title="插入 Emoji">
-                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line></svg>
-                             </button>
-                             
-                             <div v-if="showEmojiPicker" class="absolute z-50 top-full right-0 mt-1 w-64 h-48 bg-white border shadow-xl rounded-lg p-2 overflow-y-auto grid grid-cols-6 gap-1 ring-1 ring-black ring-opacity-5">
-                                 <div class="col-span-6 flex justify-between items-center mb-1 pb-1 border-b sticky top-0 bg-white z-10">
-                                     <span class="text-xs font-bold text-gray-500">選擇 Emoji</span>
-                                     <button @click="showEmojiPicker = false" class="text-gray-400 hover:text-gray-600 w-6 h-6 flex items-center justify-center rounded hover:bg-gray-100">✕</button>
-                                 </div>
-                                 <button v-for="emoji in emojiList" :key="emoji" @click="selectedElement.content += emoji" class="text-xl hover:bg-gray-100 rounded p-1 flex items-center justify-center aspect-square transition-colors">
-                                     {{ emoji }}
-                                 </button>
-                             </div>
-                        </div>
-                        
-                        <div class="mb-4">
-                            <span class="text-xs text-gray-400 block mb-1">字體大小 & 對齊</span>
-                            <div class="flex gap-2 items-center">
-                                <input type="number" v-model.number="selectedElement.fontSize" class="w-20 border rounded px-2 py-2 text-sm text-center" title="字體大小">
-                                
-                                <div class="flex border rounded overflow-hidden flex-1 h-9">
-                                    <button @click="selectedElement.textAlign = 'left'" :class="{'bg-gray-200': selectedElement.textAlign === 'left'}" class="flex-1 hover:bg-gray-100 border-r flex justify-center items-center" title="靠左對齊">
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                            <line x1="17" y1="10" x2="3" y2="10"></line>
-                                            <line x1="21" y1="6" x2="3" y2="6"></line>
-                                            <line x1="21" y1="14" x2="3" y2="14"></line>
-                                            <line x1="17" y1="18" x2="3" y2="18"></line>
-                                        </svg>
-                                    </button>
-                                    <button @click="selectedElement.textAlign = 'center'" :class="{'bg-gray-200': selectedElement.textAlign === 'center'}" class="flex-1 hover:bg-gray-100 border-r flex justify-center items-center" title="置中對齊">
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                            <line x1="21" y1="6" x2="3" y2="6"></line>
-                                            <line x1="17" y1="10" x2="7" y2="10"></line>
-                                            <line x1="19" y1="14" x2="5" y2="14"></line>
-                                            <line x1="21" y1="18" x2="3" y2="18"></line>
-                                        </svg>
-                                    </button>
-                                    <button @click="selectedElement.textAlign = 'right'" :class="{'bg-gray-200': selectedElement.textAlign === 'right'}" class="flex-1 hover:bg-gray-100 flex justify-center items-center" title="靠右對齊">
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                            <line x1="21" y1="10" x2="7" y2="10"></line>
-                                            <line x1="21" y1="6" x2="3" y2="6"></line>
-                                            <line x1="21" y1="14" x2="3" y2="14"></line>
-                                            <line x1="21" y1="18" x2="7" y2="18"></line>
-                                        </svg>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                        <color-picker v-model="selectedElement.color" label="文字顏色" class="mb-4"></color-picker>
-                    </div>
-
-                    <div class="pt-4 border-t mt-4" v-if="false"> <!-- Removed Delete Button from here -->
-                    </div>
-                </div>
-                
-                <div v-else-if="currentCard" class="p-4 space-y-4">
-                    <!-- 卡片本身屬性 -->
-                    <div>
-                        <label class="text-xs font-bold text-gray-500 block mb-1">卡片尺寸與方向</label>
-                        <div class="flex gap-2 mb-2">
-                             <button @click="setCardOrientation('portrait')" :class="{'bg-blue-100 border-blue-500 text-blue-700': isPortrait, 'bg-gray-50 hover:bg-gray-100': !isPortrait}" class="flex-1 border rounded py-2 text-xs font-bold flex flex-col items-center gap-1 transition">
-                                <div class="w-3 h-4 border-2 border-current rounded-sm"></div>
-                                直式
-                             </button>
-                             <button @click="setCardOrientation('landscape')" :class="{'bg-blue-100 border-blue-500 text-blue-700': !isPortrait, 'bg-gray-50 hover:bg-gray-100': isPortrait}" class="flex-1 border rounded py-2 text-xs font-bold flex flex-col items-center gap-1 transition">
-                                <div class="w-4 h-3 border-2 border-current rounded-sm"></div>
-                                橫式
-                             </button>
-                        </div>
-                        <div class="flex items-center gap-2 text-xs text-gray-500 justify-center">
-                            {{ currentCard.width || 63 }} x {{ currentCard.height || 88 }} mm
-                        </div>
-                    </div>
-
-                    <!-- 卡片外觀 -->
-                    <div class="pt-4 border-t space-y-4">
-                        <label class="text-xs font-bold text-gray-500 block">卡片外觀</label>
-                        
-                        <color-picker v-model="currentCard.bgColor" label="背景顏色"></color-picker>
-                        <color-picker v-model="currentCard.borderColor" label="外框顏色"></color-picker>
-
-                        <div>
-                            <span class="text-xs font-bold text-gray-500 block mb-1">外框寬度</span>
-                            <div class="flex items-center gap-2">
-                                <input type="number" v-model.number="currentCard.borderWidth" min="0" max="20" class="w-16 border rounded px-2 py-1 text-sm text-center" placeholder="0">
-                                <div class="flex border rounded overflow-hidden">
-                                    <button @click="currentCard.borderWidth = 1" class="px-3 py-1 bg-white hover:bg-gray-100 border-r text-xs font-medium text-gray-600 transition">1</button>
-                                    <button @click="currentCard.borderWidth = 2" class="px-3 py-1 bg-white hover:bg-gray-100 border-r text-xs font-medium text-gray-600 transition">2</button>
-                                    <button @click="currentCard.borderWidth = 5" class="px-3 py-1 bg-white hover:bg-gray-100 text-xs font-medium text-gray-600 transition">5</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 另存為版型 -->
-                    <div class="pt-4 border-t">
-                        <h4 class="font-bold text-sm mb-2">📥 另存為版型</h4>
-                        <p class="text-xs text-gray-500 mb-2">將目前的佈局儲存為範本。</p>
-                        <div class="flex flex-col gap-2">
-                            <input type="text" v-model="newTypeName" placeholder="版型名稱..." class="border rounded px-2 py-1 text-sm">
-                            <div class="flex gap-2">
-                                <button @click="saveAsType('global')" class="flex-1 bg-purple-500 text-white py-1 rounded text-xs hover:bg-purple-600">存入全域庫</button>
-                                <button @click="saveAsType('local')" class="flex-1 bg-indigo-500 text-white py-1 rounded text-xs hover:bg-indigo-600">存入專案庫</button>
-                            </div>
-                            <div v-if="saveMessage" :class="saveMessageType === 'error' ? 'text-red-500' : 'text-green-600'" class="text-xs text-center font-bold transition-opacity">
-                                {{ saveMessage }}
-                            </div>
-                        </div>
+                    <div v-else class="p-10 text-center text-gray-400 text-sm">
+                        請選擇一個元素或卡片以編輯屬性
                     </div>
                 </div>
 
-                <div v-else class="p-10 text-center text-gray-400 text-sm">
-                    請選擇一個元素或卡片以編輯屬性
-                </div>
-            </div>
-
-            <!-- 下半部：圖層清單 (Desktop Only) -->
-            <div class="h-1/3 border-t flex flex-col bg-white hidden md:flex" v-if="currentCard">
-                <div class="p-2 border-b bg-gray-50 text-xs font-bold text-gray-500 flex justify-between items-center">
-                    <span>圖層清單 ({{ currentCard.elements.length }})</span>
-                </div>
-                <div class="flex-1 overflow-y-auto p-2 space-y-1">
-                    <div 
-                        v-for="el in elementList" 
-                        :key="el.id"
-                        class="flex items-center gap-2 p-2 rounded border hover:border-blue-300 transition text-sm group"
-                        :class="{'bg-blue-50 border-blue-500': selectedElementId === el.id, 'bg-white border-transparent hover:bg-gray-50': selectedElementId !== el.id}"
-                        @click="selectCard(currentCard.id); selectedElementId = el.id"
+                <!-- Mobile Footer Bar -->
+                <div v-if="isMobile" class="h-14 bg-white border-t flex items-center justify-around shrink-0 safe-area-pb z-50 pointer-events-auto">
+                    <button 
+                        v-for="tab in currentMobileTabs" 
+                        :key="tab.id"
+                        @click="toggleMobileTab(tab.id)"
+                        class="flex flex-col items-center justify-center w-full h-full gap-1 active:bg-gray-100 transition relative"
+                        :class="{'text-blue-600': mobileInspectorTab === tab.id, 'text-gray-500 hover:text-gray-700': mobileInspectorTab !== tab.id}"
                     >
-                        <!-- Icon -->
-                        <div class="text-xs w-5 text-center flex-shrink-0">
-                            <span v-if="el.type === 'text'">📝</span>
-                            <span v-else>
-                                <div class="w-3 h-3 mx-auto border border-gray-300" :style="{backgroundColor: el.color, borderRadius: el.shapeType === 'circle' ? '50%' : '0'}"></div>
-                            </span>
-                        </div>
-                        
-                        <!-- Content Preview -->
-                        <div class="flex-1 truncate select-none">
-                            <span v-if="el.type === 'text'" class="font-medium text-gray-700">{{ el.content || '(空白文字)' }}</span>
-                            <span v-else class="text-gray-500 capitalize">{{ el.shapeType }}</span>
-                        </div>
+                        <div v-if="mobileInspectorTab === tab.id" class="absolute top-0 inset-x-0 h-0.5 bg-blue-600"></div>
+                        <span class="text-xl leading-none">{{ tab.icon }}</span>
+                        <span class="text-[10px] leading-none">{{ tab.name }}</span>
+                    </button>
+                </div>
 
-                        <!-- Z-Index Badge -->
-                        <div class="text-[10px] text-gray-400 font-mono bg-gray-100 px-1 rounded">
-                            z:{{ el.z }}
-                        </div>
-
-                        <!-- Actions -->
-                        <div class="flex gap-1 ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button @click.stop="cloneElement(el)" title="複製" class="p-1 hover:bg-blue-100 rounded text-gray-500 hover:text-blue-600">📄</button>
-                            <button @click.stop="removeElement(el.id)" title="刪除" class="p-1 hover:bg-red-100 rounded text-gray-500 hover:text-red-600">🗑️</button>
-                        </div>
+                <!-- Desktop Layer List (Hidden on Mobile) -->
+                <div class="h-1/3 border-t flex flex-col bg-white hidden md:flex" v-if="currentCard">
+                    <div class="p-2 border-b bg-gray-50 text-xs font-bold text-gray-500 flex justify-between items-center">
+                        <span>圖層清單 ({{ currentCard.elements.length }})</span>
                     </div>
-                    <div v-if="currentCard.elements.length === 0" class="text-center text-gray-400 text-xs mt-4">
-                        尚無元素
+                    <div class="flex-1 overflow-y-auto p-2 space-y-1">
+                        <div 
+                            v-for="el in elementList" 
+                            :key="el.id"
+                            class="flex items-center gap-2 p-2 rounded border hover:border-blue-300 transition text-sm group"
+                            :class="{'bg-blue-50 border-blue-500': selectedElementId === el.id, 'bg-white border-transparent hover:bg-gray-50': selectedElementId !== el.id}"
+                            @click="selectCard(currentCard.id); selectedElementId = el.id"
+                        >
+                            <div class="text-xs w-5 text-center flex-shrink-0">
+                                <span v-if="el.type === 'text'">📝</span>
+                                <span v-else>
+                                    <div class="w-3 h-3 mx-auto border border-gray-300" :style="{backgroundColor: el.color, borderRadius: el.shapeType === 'circle' ? '50%' : '0'}"></div>
+                                </span>
+                            </div>
+                            <div class="flex-1 truncate select-none">
+                                <span v-if="el.type === 'text'" class="font-medium text-gray-700">{{ el.content || '(空白文字)' }}</span>
+                                <span v-else class="text-gray-500 capitalize">{{ el.shapeType }}</span>
+                            </div>
+                            <div class="text-[10px] text-gray-400 font-mono bg-gray-100 px-1 rounded">
+                                z:{{ el.z }}
+                            </div>
+                            <div class="flex gap-1 ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button @click.stop="cloneElement(el)" title="複製" class="p-1 hover:bg-blue-100 rounded text-gray-500 hover:text-blue-600">📄</button>
+                                <button @click.stop="removeElement(el.id)" title="刪除" class="p-1 hover:bg-red-100 rounded text-gray-500 hover:text-red-600">🗑️</button>
+                            </div>
+                        </div>
+                        <div v-if="currentCard.elements.length === 0" class="text-center text-gray-400 text-xs mt-4">
+                            尚無元素
+                        </div>
                     </div>
                 </div>
             </div>
-
-            <!-- Mobile Bottom Toolbar (Replaced by Inspector Footer, so removing old one) -->
         </div>
-    </div>
 
         <!-- 3. 輸出列印視圖 (Print Preview) -->
         <div v-if="currentView === 'print' && currentProject" class="flex flex-col md:flex-row flex-1 overflow-hidden relative">
@@ -1127,6 +1073,7 @@
                     // Mobile State
                     showLeftSidebar: false,
                     showMobileInspector: true, // Default open on mobile footer
+                    mobileInspectorTab: null, // New: Mobile footer tab state
                     showMobileMenu: false, // New: Toggle for mobile top-right menu
                     
                     // Editor State
@@ -1223,6 +1170,21 @@
             computed: {
                 isMobile() {
                     return this.windowWidth < 768;
+                },
+                currentMobileTabs() {
+                    if (this.selectedElement) {
+                        return [
+                            { id: 'layout', name: '佈局', icon: '📐' },
+                            { id: 'style', name: '樣式', icon: '🎨' },
+                            { id: 'content', name: '內容', icon: '📝' }
+                        ];
+                    } else if (this.currentCard) {
+                        return [
+                            { id: 'card-layout', name: '尺寸', icon: '📏' },
+                            { id: 'card-style', name: '外觀', icon: '💅' }
+                        ];
+                    }
+                    return [];
                 },
                 currentProject() {
                     return this.projects.find(p => p.id === this.currentProjectId);
@@ -1354,6 +1316,23 @@
                 window.removeEventListener('resize', this.handleResize);
             },
             methods: {
+                toggleMobileTab(tabId) {
+                    if (this.mobileInspectorTab === tabId) {
+                        this.mobileInspectorTab = null;
+                    } else {
+                        this.mobileInspectorTab = tabId;
+                    }
+                },
+                getMobileTabName(id) {
+                    const map = {
+                        'layout': '位置與尺寸',
+                        'style': '樣式',
+                        'content': '內容',
+                        'card-layout': '卡片尺寸',
+                        'card-style': '卡片外觀'
+                    };
+                    return map[id] || '屬性';
+                },
                 // --- Helpers ---
                 uuid() {
                     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
@@ -2294,4 +2273,3 @@
     </script>
 </body>
 </html>
-
