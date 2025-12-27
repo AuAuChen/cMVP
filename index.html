@@ -120,7 +120,7 @@
                     
                     <div class="flex items-baseline gap-2">
                         <h1 class="text-xl font-bold">cMVP</h1>
-                        <span class="text-xs text-gray-500 font-mono hidden md:inline">v1.4.2</span>
+                        <span class="text-xs text-gray-500 font-mono hidden md:inline">v1.5.0</span>
                         <span v-if="currentProject" class="text-xs text-gray-400 bg-gray-700 px-2 py-0.5 rounded-full truncate max-w-[100px] md:max-w-none hidden sm:inline">
                             {{ currentProject.name }}
                         </span>
@@ -514,7 +514,7 @@
                             v-for="element in currentCard.elements" 
                             :key="element.id"
                             :style="getElementStyle(element)"
-                            class="absolute cursor-move hover:outline hover:outline-1 hover:outline-blue-300 no-select flex items-center justify-center overflow-hidden"
+                            class="absolute cursor-move hover:outline hover:outline-1 hover:outline-blue-300 no-select flex items-center justify-center"
                             :class="{'element-selected': selectedElementId === element.id}"
                             @mousedown.stop="startDrag($event, element)"
                             @touchstart.stop="startDrag($event, element)"
@@ -529,6 +529,31 @@
                             >
                                 {{ element.content || '文字' }}
                             </span>
+                            
+                            <!-- Shape Content Display (SVG) -->
+                            <svg v-if="element.type === 'shape'" viewBox="0 0 100 100" preserveAspectRatio="none" class="w-full h-full block overflow-visible">
+                                <polygon 
+                                    v-if="element.shapeType !== 'circle' && element.shapeType !== 'rectangle'" 
+                                    :points="getShapePoints(element.shapeType)" 
+                                    :fill="element.color"
+                                    :stroke="element.strokeColor || 'none'"
+                                    :stroke-width="(element.strokeWidth || 0) * (100 / (element.w || 100))"
+                                />
+                                <rect 
+                                    v-if="element.shapeType === 'rectangle'" 
+                                    x="0" y="0" width="100" height="100" 
+                                    :fill="element.color"
+                                    :stroke="element.strokeColor || 'none'"
+                                    :stroke-width="(element.strokeWidth || 0) * (100 / (element.w || 100))"
+                                />
+                                <circle 
+                                    v-if="element.shapeType === 'circle'" 
+                                    cx="50" cy="50" r="50" 
+                                    :fill="element.color"
+                                    :stroke="element.strokeColor || 'none'"
+                                    :stroke-width="(element.strokeWidth || 0) * (100 / (element.w || 100))"
+                                />
+                            </svg>
 
                             <!-- Text Content Editor (In-Place) -->
                             <div
@@ -605,6 +630,16 @@
                                 <input type="range" v-model.number="selectedElement.h" min="10" :max="(currentCard.height || 88) * screenScale" class="flex-1 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer">
                              </div>
                         </div>
+
+                        <!-- Rotation Input -->
+                        <div class="mb-2 space-y-2 border-t pt-2">
+                             <div class="flex items-center gap-2">
+                                <span class="text-xs text-gray-400 w-3 font-bold">R</span>
+                                <input type="number" v-model.number="selectedElement.rotation" class="w-16 border rounded px-2 py-1 text-sm" placeholder="0">
+                                <input type="range" v-model.number="selectedElement.rotation" min="0" max="360" class="flex-1 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                             </div>
+                        </div>
+
                         <div class="grid grid-cols-6 gap-1 mt-2">
                              <button @click="alignElement('left')" title="置左" class="bg-gray-100 hover:bg-gray-200 border rounded p-1 text-xs font-mono">|&lt;</button>
                              <button @click="alignElement('center-h')" title="水平置中" class="bg-gray-100 hover:bg-gray-200 border rounded p-1 text-xs font-mono">&gt;|&lt;</button>
@@ -636,8 +671,24 @@
                     <div v-if="selectedElement.type === 'shape'">
                         <label class="text-xs font-bold text-gray-500 block mb-1">樣式</label>
                         <div class="space-y-4">
-                            <color-picker v-model="selectedElement.color" label="顏色"></color-picker>
+                            <color-picker v-model="selectedElement.color" label="填滿顏色"></color-picker>
                             
+                            <!-- Stroke Controls -->
+                            <div class="border-t pt-2 mt-2">
+                                <span class="text-xs font-bold text-gray-500 block mb-2">線條 (Stroke)</span>
+                                <color-picker v-model="selectedElement.strokeColor" label="線條顏色"></color-picker>
+                                
+                                <div class="mt-2 flex items-center gap-2">
+                                    <span class="text-xs text-gray-400">寬度</span>
+                                    <input type="number" v-model.number="selectedElement.strokeWidth" min="0" max="20" class="w-16 border rounded px-2 py-1 text-sm text-center" placeholder="0">
+                                    <div class="flex border rounded overflow-hidden">
+                                        <button @click="selectedElement.strokeWidth = 1" class="px-3 py-1 bg-white hover:bg-gray-100 border-r text-xs font-medium text-gray-600 transition">1</button>
+                                        <button @click="selectedElement.strokeWidth = 2" class="px-3 py-1 bg-white hover:bg-gray-100 border-r text-xs font-medium text-gray-600 transition">2</button>
+                                        <button @click="selectedElement.strokeWidth = 5" class="px-3 py-1 bg-white hover:bg-gray-100 text-xs font-medium text-gray-600 transition">5</button>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div>
                                 <span class="text-xs text-gray-400 block mb-1">形狀選擇</span>
                                 <div class="grid grid-cols-4 gap-2">
@@ -670,7 +721,22 @@
                     <!-- 文字專屬 -->
                     <div v-if="selectedElement.type === 'text'">
                         <label class="text-xs font-bold text-gray-500 block mb-1">內容與文字</label>
-                        <textarea v-model="selectedElement.content" rows="3" class="w-full border rounded p-2 text-sm mb-2" placeholder="輸入文字..."></textarea>
+                        <div class="relative mb-2">
+                             <textarea v-model="selectedElement.content" rows="3" class="w-full border rounded p-2 text-sm pb-8" placeholder="輸入文字..."></textarea>
+                             <button @click="showEmojiPicker = !showEmojiPicker" class="absolute bottom-2 right-2 text-gray-400 hover:text-gray-600 bg-white hover:bg-gray-50 rounded p-1 border shadow-sm transition-colors" title="插入 Emoji">
+                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M8 14s1.5 2 4 2 4-2 4-2"></path><line x1="9" y1="9" x2="9.01" y2="9"></line><line x1="15" y1="9" x2="15.01" y2="9"></line></svg>
+                             </button>
+                             
+                             <div v-if="showEmojiPicker" class="absolute z-50 top-full right-0 mt-1 w-64 h-48 bg-white border shadow-xl rounded-lg p-2 overflow-y-auto grid grid-cols-6 gap-1 ring-1 ring-black ring-opacity-5">
+                                 <div class="col-span-6 flex justify-between items-center mb-1 pb-1 border-b sticky top-0 bg-white z-10">
+                                     <span class="text-xs font-bold text-gray-500">選擇 Emoji</span>
+                                     <button @click="showEmojiPicker = false" class="text-gray-400 hover:text-gray-600 w-6 h-6 flex items-center justify-center rounded hover:bg-gray-100">✕</button>
+                                 </div>
+                                 <button v-for="emoji in emojiList" :key="emoji" @click="selectedElement.content += emoji" class="text-xl hover:bg-gray-100 rounded p-1 flex items-center justify-center aspect-square transition-colors">
+                                     {{ emoji }}
+                                 </button>
+                             </div>
+                        </div>
                         
                         <div class="mb-4">
                             <span class="text-xs text-gray-400 block mb-1">字體大小 & 對齊</span>
@@ -949,24 +1015,30 @@
                                     </span>
 
                                     <!-- SVG Shape Element (For Print/Export Stability) -->
-                                    <svg v-if="el.type === 'shape'" viewBox="0 0 100 100" preserveAspectRatio="none" class="w-full h-full block">
+                                    <svg v-if="el.type === 'shape'" viewBox="0 0 100 100" preserveAspectRatio="none" class="w-full h-full block overflow-visible">
                                         <!-- Complex Shapes -->
                                         <polygon 
                                             v-if="el.shapeType !== 'circle' && el.shapeType !== 'rectangle'" 
                                             :points="getShapePoints(el.shapeType)" 
                                             :fill="el.color" 
+                                            :stroke="el.strokeColor || 'none'"
+                                            :stroke-width="(el.strokeWidth || 0) * (100 / el.w)"
                                         />
                                         <!-- Rectangle -->
                                         <rect 
                                             v-if="el.shapeType === 'rectangle'" 
                                             x="0" y="0" width="100" height="100" 
                                             :fill="el.color" 
+                                            :stroke="el.strokeColor || 'none'"
+                                            :stroke-width="(el.strokeWidth || 0) * (100 / el.w)"
                                         />
                                         <!-- Circle -->
                                         <circle 
                                             v-if="el.shapeType === 'circle'" 
                                             cx="50" cy="50" r="50" 
                                             :fill="el.color" 
+                                            :stroke="el.strokeColor || 'none'"
+                                            :stroke-width="(el.strokeWidth || 0) * (100 / el.w)"
                                         />
                                     </svg>
                                 </div>
@@ -1057,6 +1129,52 @@
                     renamingTypeId: null,   // New: Track which template is being renamed
                     sidebarTab: 'cards',    // 'cards' or 'templates'
                     
+                    showEmojiPicker: false,
+                    emojiList: [
+                        "😀", "😃", "😄", "😁", "😆", "😅", "😂", "🤣", "😊", "😇",
+                        "🙂", "🙃", "😉", "😌", "😍", "🥰", "😘", "😗", "😙", "😚",
+                        "😋", "😛", "😝", "😜", "🤪", "🤨", "🧐", "🤓", "😎", "🤩",
+                        "🥳", "😏", "😒", "😞", "😔", "😟", "😕", "🙁", "☹️", "😣",
+                        "😖", "😫", "😩", "🥺", "😢", "😭", "😤", "😠", "😡", "🤬",
+                        "🤯", "😳", "🥵", "🥶", "😱", "😨", "😰", "😥", "😓", "🤗",
+                        "🤔", "🤭", "🤫", "🤥", "😶", "😐", "😑", "😬", "🙄", "😯",
+                        "😦", "😧", "😮", "😲", "😴", "🤤", "😪", "😵", "🤐", "🥴",
+                        "🤢", "🤮", "🤧", "😷", "🤒", "🤕", "🤑", "🤠", "😈", "👿",
+                        "👹", "👺", "🤡", "💩", "👻", "💀", "☠️", "👽", "👾", "🤖",
+                        "🎃", "😺", "😸", "😹", "😻", "😼", "😽", "🙀", "😿", "😾",
+                        "👋", "🤚", "🖐", "✋", "🖖", "👌", "🤏", "✌️", "🤞", "🤟",
+                        "🤘", "🤙", "👈", "👉", "👆", "🖕", "👇", "☝️", "👍", "👎",
+                        "✊", "👊", "🤛", "🤜", "👏", "🙌", "👐", "🤲", "🤝", "🙏",
+                        "✍️", "💅", "🤳", "💪", "🦾", "🦵", "🦿", "🦶", "👂", "🦻",
+                        "👃", "🧠", "🦷", "🦴", "👀", "👁", "👅", "👄", "💋", "🩸",
+                        "❤️", "🧡", "💛", "💚", "💙", "💜", "🤎", "🖤", "🤍", "💔",
+                        "❣️", "💕", "💞", "💓", "💗", "💖", "💘", "💝", "💟", "☮️",
+                        "✝️", "☪️", "🕉", "☸️", "✡️", "🔯", "🕎", "☯️", "☦️", "🛐",
+                        "⛎", "♈", "♉", "♊", "♋", "♌", "♍", "♎", "♏", "♐",
+                        "♑", "♒", "♓", "🆔", "⚛️", "🉑", "☢️", "☣️", "📴", "📳",
+                        "🈶", "🈚", "🈸", "🈺", "🈷️", "✴️", "🆚", "💮", "🉐", "㊙️",
+                        "㊗️", "🈴", "🈵", "🈹", "🈲", "🅰️", "🅱️", "🆎", "🆑", "🅾️",
+                        "🆘", "❌", "⭕", "🛑", "⛔", "📛", "🚫", "💯", "💢", "♨️",
+                        "🚷", "🚯", "🚳", "🚱", "🔞", "📵", "🚭", "❗", "❕", "❓",
+                        "❔", "‼", "⁉", "🔅", "🔆", "〽️", "⚠️", "🚸", "🔱", "⚜️",
+                        "🔰", "♻️", "✅", "🈯", "💹", "❇️", "✳️", "❎", "🌐", "💠",
+                        "Ⓜ️", "🌀", "💤", "🏧", "🚾", "♿", "🅿️", "🈳", "🈂️", "🛂",
+                        "🛃", "🛄", "🛅", "🚹", "🚺", "🚼", "🚻", "🚮", "🎦", "📶",
+                        "🈁", "🔣", "ℹ️", "🔤", "🔡", "🔠", "🆖", "🆗", "🆙", "🆒",
+                        "🆕", "🆓", "0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣",
+                        "7️⃣", "8️⃣", "9️⃣", "🔟", "🔢", "#️⃣", "*️⃣", "⏏️", "▶️",
+                        "⏸", "⏯", "⏹", "⏺", "⏭", "⏮", "⏩", "⏪", "⏫", "⏬",
+                        "◀️", "🔼", "🔽", "➡️", "⬅️", "⬆️", "⬇️", "↗️", "↘️",
+                        "↙️", "↖️", "↕️", "↔️", "↪️", "↩️", "⤴️", "⤵️", "🔀", "🔁",
+                        "🔂", "🔄", "🔃", "🎵", "🎶", "➕", "➖", "➗", "✖️", "💲",
+                        "💱", "™️", "©️", "®️", "〰️", "➰", "➿", "🔚", "🔙", "🔛",
+                        "🔝", "🔜", "✔️", "☑️", "🔘", "🔴", "🟠", "🟡", "🟢", "🔵",
+                        "🟣", "⚫", "⚪", "🟤", "🔺", "🔻", "🔸", "🔹", "🔶", "🔷",
+                        "🔳", "🔲", "▪️", "▫️", "◾", "◽", "◼️", "◻️", "🟥", "🟧",
+                        "🟨", "🟩", "🟦", "🟪", "🟫", "⬛", "⬜", "🛡️", "⚔️", "⚖️",
+                        "💣", "🧨", "🪄", "🔮", "🧿", "🪬", "💈", "⚗️", "🔭", "🔬"
+                    ],
+
                     // Print State
                     printSelection: [], // Array of card IDs
                     printQuantities: {}, // New: Map card ID to quantity
@@ -1399,6 +1517,7 @@
                         x: 20,
                         y: 20,
                         z: this.currentCard.elements.length + 1,
+                        rotation: 0 // New: Rotation
                     };
 
                     if (type === 'text') {
@@ -1413,7 +1532,9 @@
                         Object.assign(base, {
                             w: 30, h: 30,
                             color: '#e2e8f0',
-                            shapeType: 'rectangle' // rectangle, circle, triangle, triangle-inverted, star, hexagon, heart
+                            shapeType: 'rectangle', // rectangle, circle, triangle, triangle-inverted, star, hexagon, heart
+                            strokeColor: '#000000', // New: Stroke
+                            strokeWidth: 0          // New: Stroke Width
                         });
                     }
                     
@@ -1603,36 +1724,11 @@
                         width: `${el.w}px`,
                         height: `${el.h}px`,
                         zIndex: el.z,
+                        transform: `rotate(${el.rotation || 0}deg)` // New: Rotation
                     };
                     
-                    if (el.type === 'shape') {
-                        style.backgroundColor = el.color;
-                        
-                        switch(el.shapeType) {
-                            case 'circle':
-                                style.borderRadius = '50%';
-                                break;
-                            case 'triangle':
-                                style.clipPath = 'polygon(50% 0%, 0% 100%, 100% 100%)';
-                                break;
-                            case 'triangle-inverted':
-                                style.clipPath = 'polygon(50% 100%, 0% 0%, 100% 0%)';
-                                break;
-                            case 'star':
-                                style.clipPath = 'polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)';
-                                break;
-                            case 'hexagon':
-                                style.clipPath = 'polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)';
-                                break;
-                            case 'heart':
-                                style.clipPath = 'polygon(50% 85%, 100% 38%, 82% 0%, 50% 25%, 18% 0%, 0% 38%)'; 
-                                break;
-                            case 'rectangle':
-                            default:
-                                style.borderRadius = '0';
-                                break;
-                        }
-                    }
+                    // Note: Background color and shape clipping are now handled by SVG in the template
+                    // to ensure consistency and stroke support.
                     
                     return style;
                 },
@@ -1666,7 +1762,8 @@
                         width: `${el.w * scale}mm`,
                         height: `${el.h * scale}mm`,
                         zIndex: el.z,
-                        position: 'absolute'
+                        position: 'absolute',
+                        transform: `rotate(${el.rotation || 0}deg)` // New: Rotation
                     };
 
                     // Note: Background color and shape clipping are now handled by SVG in the template
