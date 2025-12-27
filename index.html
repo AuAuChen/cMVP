@@ -120,7 +120,7 @@
                     
                     <div class="flex items-baseline gap-2">
                         <h1 class="text-xl font-bold">cMVP</h1>
-                        <span class="text-xs text-gray-500 font-mono hidden md:inline">v1.5.0</span>
+                        <span class="text-xs text-gray-500 font-mono hidden md:inline">v1.5.1</span>
                         <span v-if="currentProject" class="text-xs text-gray-400 bg-gray-700 px-2 py-0.5 rounded-full truncate max-w-[100px] md:max-w-none hidden sm:inline">
                             {{ currentProject.name }}
                         </span>
@@ -489,15 +489,31 @@
                 </div>
 
                 <!-- 畫布區域 -->
-                <div class="flex-1 overflow-auto flex flex-col items-center justify-center p-4 md:p-8">
-                    <div v-if="currentCard" class="relative">
+                <div 
+                    class="flex-1 flex flex-col items-center justify-center p-4 md:p-8 relative bg-gray-200"
+                    :class="{'overflow-hidden touch-none': isMobile, 'overflow-auto': !isMobile}"
+                    @touchstart="handleViewTouchStart"
+                    @touchmove="handleViewTouchMove"
+                    @touchend="handleViewTouchEnd"
+                    @click="deselectElement"
+                >
+                    <!-- Floating Zoom Controls (Mobile Only) -->
+                    <div v-if="isMobile" class="absolute bottom-4 left-4 flex flex-col gap-2 z-30 pointer-events-auto">
+                        <button @click.stop="updateViewZoom(0.1)" class="w-10 h-10 bg-white rounded-full shadow flex items-center justify-center text-xl font-bold hover:bg-gray-50 active:bg-gray-200">+</button>
+                        <button @click.stop="resetView" class="w-10 h-10 bg-white rounded-full shadow flex items-center justify-center text-xs font-bold hover:bg-gray-50 active:bg-gray-200">{{ Math.round(viewScale * 100) }}%</button>
+                        <button @click.stop="updateViewZoom(-0.1)" class="w-10 h-10 bg-white rounded-full shadow flex items-center justify-center text-xl font-bold hover:bg-gray-50 active:bg-gray-200">-</button>
+                    </div>
+
+                    <div v-if="currentCard" class="relative transition-transform duration-75 ease-linear origin-center"
+                         :style="isMobile ? { transform: `translate(${viewOffset.x}px, ${viewOffset.y}px) scale(${viewScale})` } : {}"
+                    >
                     <!-- 比例尺標示 -->
                     <div class="absolute -top-6 left-0 text-xs text-gray-500">{{ currentCard.width || 63 }}mm</div>
                     <div class="absolute top-0 -left-8 text-xs text-gray-500 h-full flex items-center" style="writing-mode: vertical-rl;">{{ currentCard.height || 88 }}mm</div>
                     
                     <!-- 卡片本體 -->
                     <div 
-                        class="card-canvas"
+                        class="card-canvas shadow-xl"
                         :style="{
                             width: (currentCard.width || 63) * screenScale + 'px',
                             height: (currentCard.height || 88) * screenScale + 'px',
@@ -572,8 +588,7 @@
                 </div>
                 <div v-else class="text-gray-400 text-lg">請選擇或建立一張卡片</div>
                 </div>
-
-            </div>
+                </div>
 
             <!-- 右側：屬性檢查器 (Inspector) -->
             <!-- Desktop: Standard Sidebar / Mobile: Bottom Sheet Footer -->
@@ -1119,6 +1134,15 @@
                     selectedElementId: null,
                     draggingElementId: null,
                     dragOffset: { x: 0, y: 0 },
+                    
+                    // Canvas View State (Mobile Only)
+                    windowWidth: window.innerWidth,
+                    viewScale: 1.0,
+                    viewOffset: { x: 0, y: 0 },
+                    lastTouchDist: 0,
+                    lastTouchCenter: { x: 0, y: 0 },
+                    isViewGesturing: false,
+
                     newTypeName: '',
                     saveMessage: '',        // New: Temporary message for save feedback
                     saveMessageType: '',    // 'success' or 'error'
@@ -1198,6 +1222,9 @@
                 }
             },
             computed: {
+                isMobile() {
+                    return this.windowWidth < 768;
+                },
                 currentProject() {
                     return this.projects.find(p => p.id === this.currentProjectId);
                 },
@@ -1319,11 +1346,13 @@
             mounted() {
                 this.loadData();
                 window.addEventListener('keydown', this.handleKeydown);
+                window.addEventListener('resize', this.handleResize);
                 // Initial record after load if card exists
                 if(this.currentCard) this.recordHistory();
             },
             beforeUnmount() {
                 window.removeEventListener('keydown', this.handleKeydown);
+                window.removeEventListener('resize', this.handleResize);
             },
             methods: {
                 // --- Helpers ---
@@ -1335,6 +1364,174 @@
                 },
                 getCardById(id) {
                     return this.currentProject.cards.find(c => c.id === id);
+                },
+
+                // --- Canvas View Navigation (Pan & Zoom) ---
+                handleViewTouchStart(e) {
+                    // Ignore if touching an element that is being dragged (bubbling stopped there usually, but safe check)
+                    // If e.target is part of UI controls, ignore.
+                    if (e.target.closest('button') || e.target.closest('.element-selected')) return;
+
+                    if (e.touches.length === 1) {
+                        this.isViewGesturing = true;
+                        this.lastTouchCenter = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                    } else if (e.touches.length === 2) {
+                        this.isViewGesturing = true;
+                        const dx = e.touches[0].clientX - e.touches[1].clientX;
+                        const dy = e.touches[0].clientY - e.touches[1].clientY;
+                        this.lastTouchDist = Math.sqrt(dx*dx + dy*dy);
+                        this.lastTouchCenter = {
+                            x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+                            y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+                        };
+                    }
+                },
+                handleViewTouchMove(e) {
+                    if (!this.isViewGesturing) return;
+                    if (e.cancelable) e.preventDefault(); // Stop browser gestures
+
+                    if (e.touches.length === 1) {
+                        // Pan
+                        const cx = e.touches[0].clientX;
+                        const cy = e.touches[0].clientY;
+                        const dx = cx - this.lastTouchCenter.x;
+                        const dy = cy - this.lastTouchCenter.y;
+                        
+                        this.viewOffset.x += dx;
+                        this.viewOffset.y += dy;
+                        
+                        this.lastTouchCenter = { x: cx, y: cy };
+                    } else if (e.touches.length === 2) {
+                        // Pinch Zoom + Pan
+                        const dx = e.touches[0].clientX - e.touches[1].clientX;
+                        const dy = e.touches[0].clientY - e.touches[1].clientY;
+                        const dist = Math.sqrt(dx*dx + dy*dy);
+                        
+                        const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+                        const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+                        
+                        // Scale logic
+                        if (this.lastTouchDist > 0) {
+                            const scaleFactor = dist / this.lastTouchDist;
+                            const newScale = Math.min(Math.max(0.1, this.viewScale * scaleFactor), 5.0);
+                            this.viewScale = newScale;
+                        }
+                        
+                        // Pan logic (follow midpoint)
+                        const moveX = cx - this.lastTouchCenter.x;
+                        const moveY = cy - this.lastTouchCenter.y;
+                        this.viewOffset.x += moveX;
+                        this.viewOffset.y += moveY;
+                        
+                        this.lastTouchDist = dist;
+                        this.lastTouchCenter = { x: cx, y: cy };
+                    }
+                },
+                handleViewTouchEnd(e) {
+                    if (e.touches.length === 0) {
+                        this.isViewGesturing = false;
+                    } else if (e.touches.length === 1) {
+                        // Transition 2->1 finger
+                        this.lastTouchCenter = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                    }
+                },
+                handleViewWheel(e) {
+                    // Support mouse wheel zoom with ctrl key
+                    if (e.ctrlKey) {
+                        e.preventDefault();
+                        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+                        this.updateViewZoom(delta);
+                    }
+                },
+                updateViewZoom(delta) {
+                    const newScale = Math.min(Math.max(0.1, this.viewScale + delta), 5.0);
+                    this.viewScale = newScale;
+                },
+                resetView() {
+                    this.viewScale = 1.0;
+                    this.viewOffset = { x: 0, y: 0 };
+                },
+
+                // --- Canvas View Navigation (Mobile Only) ---
+                handleResize() {
+                    this.windowWidth = window.innerWidth;
+                },
+                handleViewTouchStart(e) {
+                    if (!this.isMobile) return;
+                    // Ignore if touching an element that is being dragged
+                    if (e.target.closest('button') || e.target.closest('.element-selected')) return;
+
+                    if (e.touches.length === 1) {
+                        this.isViewGesturing = true;
+                        this.lastTouchCenter = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                    } else if (e.touches.length === 2) {
+                        this.isViewGesturing = true;
+                        const dx = e.touches[0].clientX - e.touches[1].clientX;
+                        const dy = e.touches[0].clientY - e.touches[1].clientY;
+                        this.lastTouchDist = Math.sqrt(dx*dx + dy*dy);
+                        this.lastTouchCenter = {
+                            x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+                            y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+                        };
+                    }
+                },
+                handleViewTouchMove(e) {
+                    if (!this.isMobile || !this.isViewGesturing) return;
+                    if (e.cancelable) e.preventDefault(); // Stop browser gestures
+
+                    if (e.touches.length === 1) {
+                        // Pan
+                        const cx = e.touches[0].clientX;
+                        const cy = e.touches[0].clientY;
+                        const dx = cx - this.lastTouchCenter.x;
+                        const dy = cy - this.lastTouchCenter.y;
+                        
+                        this.viewOffset.x += dx;
+                        this.viewOffset.y += dy;
+                        
+                        this.lastTouchCenter = { x: cx, y: cy };
+                    } else if (e.touches.length === 2) {
+                        // Pinch Zoom + Pan
+                        const dx = e.touches[0].clientX - e.touches[1].clientX;
+                        const dy = e.touches[0].clientY - e.touches[1].clientY;
+                        const dist = Math.sqrt(dx*dx + dy*dy);
+                        
+                        const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+                        const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+                        
+                        // Scale logic
+                        if (this.lastTouchDist > 0) {
+                            const scaleFactor = dist / this.lastTouchDist;
+                            const newScale = Math.min(Math.max(0.1, this.viewScale * scaleFactor), 5.0);
+                            this.viewScale = newScale;
+                        }
+                        
+                        // Pan logic
+                        const moveX = cx - this.lastTouchCenter.x;
+                        const moveY = cy - this.lastTouchCenter.y;
+                        this.viewOffset.x += moveX;
+                        this.viewOffset.y += moveY;
+                        
+                        this.lastTouchDist = dist;
+                        this.lastTouchCenter = { x: cx, y: cy };
+                    }
+                },
+                handleViewTouchEnd(e) {
+                    if (!this.isMobile) return;
+                    if (e.touches.length === 0) {
+                        this.isViewGesturing = false;
+                    } else if (e.touches.length === 1) {
+                        // Transition 2->1 finger
+                        this.lastTouchCenter = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                    }
+                },
+                updateViewZoom(delta) {
+                    const newScale = Math.min(Math.max(0.1, this.viewScale + delta), 5.0);
+                    this.viewScale = newScale;
+                },
+                resetView() {
+                    this.viewScale = 1.0;
+                    this.viewOffset = { x: 0, y: 0 };
                 },
 
                 // --- Project Management ---
