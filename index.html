@@ -30,6 +30,14 @@
             -webkit-user-select: text;
             user-select: text;
         }
+        
+        /* Safe Area Utilities */
+        .safe-area-pt {
+            padding-top: calc(0.75rem + env(safe-area-inset-top));
+        }
+        .safe-area-pb {
+            padding-bottom: env(safe-area-inset-bottom);
+        }
 
         /* 防止選取文字干擾拖曳 */
         .no-select {
@@ -128,7 +136,7 @@
     <div id="app" class="h-full flex flex-col">
         
         <!-- 頂部導航欄 (No Print) -->
-        <nav class="bg-gray-800 text-white p-3 flex flex-nowrap justify-between items-center no-print shadow-md z-50 gap-2 sticky top-0 h-14">
+        <nav class="bg-gray-800 text-white p-3 flex flex-nowrap justify-between items-center no-print shadow-md z-50 gap-2 sticky top-0 min-h-[3.5rem] safe-area-pt">
             <!-- Left: Logo & Hamburger -->
             <div class="flex items-center gap-4 shrink-0">
                 <div class="flex items-center gap-3">
@@ -139,7 +147,7 @@
                     
                     <div class="flex items-baseline gap-2">
                         <h1 class="text-xl font-bold cursor-pointer hover:text-gray-300 transition" @click="currentView = 'projects'">cMVP</h1>
-                        <span class="text-[10px] md:text-xs text-gray-400 font-mono">v2.0.2</span>
+                        <span class="text-[10px] md:text-xs text-gray-400 font-mono">v2.0.3</span>
                         <span v-if="currentProject" class="text-xs text-gray-400 bg-gray-700 px-2 py-0.5 rounded-full truncate max-w-[100px] md:max-w-none hidden sm:inline">
                             {{ currentProject.name }}
                         </span>
@@ -849,12 +857,12 @@
                 </div>
 
                 <!-- Mobile Footer Bar -->
-                <div v-if="isMobile" class="h-14 bg-white border-t flex items-center justify-around shrink-0 safe-area-pb z-50 pointer-events-auto">
+                <div v-if="isMobile" class="min-h-[3.5rem] bg-white border-t flex items-start justify-around shrink-0 safe-area-pb z-50 pointer-events-auto">
                     <button 
                         v-for="tab in currentMobileTabs" 
                         :key="tab.id"
                         @click="toggleMobileTab(tab.id)"
-                        class="flex flex-col items-center justify-center w-full h-full gap-1 active:bg-gray-100 transition relative"
+                        class="flex flex-col items-center justify-center w-full h-14 gap-1 active:bg-gray-100 transition relative"
                         :class="{'text-blue-600': mobileInspectorTab === tab.id, 'text-gray-500 hover:text-gray-700': mobileInspectorTab !== tab.id}"
                     >
                         <div v-if="mobileInspectorTab === tab.id" class="absolute top-0 inset-x-0 h-0.5 bg-blue-600"></div>
