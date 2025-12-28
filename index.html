@@ -120,7 +120,7 @@
                     
                     <div class="flex items-baseline gap-2">
                         <h1 class="text-xl font-bold cursor-pointer hover:text-gray-300 transition" @click="currentView = 'projects'">cMVP</h1>
-                        <span class="text-xs text-gray-500 font-mono hidden md:inline">v1.5.21</span>
+                        <span class="text-xs text-gray-500 font-mono hidden md:inline">v1.5.23</span>
                         <span v-if="currentProject" class="text-xs text-gray-400 bg-gray-700 px-2 py-0.5 rounded-full truncate max-w-[100px] md:max-w-none hidden sm:inline">
                             {{ currentProject.name }}
                         </span>
@@ -457,8 +457,8 @@
                             <div 
                                 v-for="el in elementList" 
                                 :key="el.id"
-                                class="flex items-center gap-2 p-2 rounded border hover:border-blue-300 transition text-sm group bg-white"
-                                :class="{'bg-blue-50 border-blue-500': selectedElementId === el.id}"
+                                class="flex items-center gap-2 p-2 rounded border hover:border-blue-300 transition text-sm group"
+                                :class="{'bg-blue-50 border-blue-500': selectedElementId === el.id, 'bg-gray-100 border-gray-300': el.locked && selectedElementId !== el.id, 'bg-white': !el.locked && selectedElementId !== el.id}"
                                 @click="selectCard(currentCard.id); selectedElementId = el.id; showLeftSidebar = false"
                             >
                                 <!-- Icon -->
@@ -482,8 +482,11 @@
 
                                 <!-- Actions -->
                                 <div class="flex gap-1 ml-1">
+                                    <button @click.stop="el.locked = !el.locked" :title="el.locked ? '解鎖' : '鎖定'" class="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-800 text-xs">
+                                        {{ el.locked ? '🔒' : '🔓' }}
+                                    </button>
                                     <button @click.stop="cloneElement(el)" title="複製" class="p-1 hover:bg-blue-100 rounded text-gray-500 hover:text-blue-600">📄</button>
-                                    <button @click.stop="removeElement(el.id)" title="刪除" class="p-1 hover:bg-red-100 rounded text-gray-500 hover:text-red-600">🗑️</button>
+                                    <button @click.stop="removeElement(el.id)" :title="el.locked ? '已鎖定' : '刪除'" :disabled="el.locked" class="p-1 rounded text-gray-500" :class="el.locked ? 'opacity-30 cursor-not-allowed' : 'hover:bg-red-100 hover:text-red-600'">🗑️</button>
                                 </div>
                             </div>
                             <div v-if="currentCard.elements.length === 0" class="text-center text-gray-400 text-xs mt-4">
@@ -635,7 +638,7 @@
                         <!-- Layout Tab: Position, Size, Rotation, Alignment, Z-Index -->
                         <div v-show="!isMobile || mobileInspectorTab === 'layout'">
                             <label class="text-xs font-bold text-gray-500 block mb-1">位置與尺寸 (px)</label>
-                            
+                            <div :class="{'opacity-50 pointer-events-none': selectedElement.locked}">
                             <!-- X & Y -->
                             <div class="mb-4 space-y-2">
                                  <div class="flex items-center gap-2">
@@ -682,12 +685,13 @@
                                  <button @click="alignElement('center-v')" title="垂直置中" class="bg-gray-100 hover:bg-gray-200 border rounded p-1 text-xs font-mono">M</button>
                                  <button @click="alignElement('bottom')" title="置底" class="bg-gray-100 hover:bg-gray-200 border rounded p-1 text-xs font-mono">B</button>
                             </div>
+                            </div>
                         </div>
 
                         <!-- Layers Tab: Z-Index -->
                         <div v-show="!isMobile || mobileInspectorTab === 'layers'">
                             <label class="text-xs font-bold text-gray-500 block mb-1">層級 (Z-Index)</label>
-                            <div class="flex gap-2 items-center">
+                            <div class="flex gap-2 items-center" :class="{'opacity-50 pointer-events-none': selectedElement.locked}">
                                 <div class="flex border rounded overflow-hidden flex-1 h-9">
                                     <button @click="bringToFront" class="flex-1 bg-gray-50 hover:bg-gray-100 border-r text-xs font-bold flex items-center justify-center gap-1">置頂</button>
                                     <button @click="sendToBack" class="flex-1 bg-gray-50 hover:bg-gray-100 text-xs font-bold flex items-center justify-center gap-1">置底</button>
@@ -699,7 +703,7 @@
                         <!-- Style Tab: Colors, Strokes -->
                         <div v-show="!isMobile || mobileInspectorTab === 'style'">
                             <label class="text-xs font-bold text-gray-500 block mb-1">樣式</label>
-                            <div class="space-y-4">
+                            <div class="space-y-4" :class="{'opacity-50 pointer-events-none': selectedElement.locked}">
                                 <color-picker v-if="selectedElement.type === 'shape' || selectedElement.type === 'text'" v-model="selectedElement.color" :label="selectedElement.type === 'text' ? '文字顏色' : '填滿顏色'"></color-picker>
                                 
                                 <div v-if="selectedElement.type === 'shape'" class="border-t pt-2 mt-2">
@@ -720,6 +724,7 @@
 
                         <!-- Content Tab: Text Content, Font, Shape Type -->
                         <div v-show="!isMobile || mobileInspectorTab === 'content'">
+                           <div :class="{'opacity-50 pointer-events-none': selectedElement.locked}">
                             <div v-if="selectedElement.type === 'text'">
                                 <label class="text-xs font-bold text-gray-500 block mb-1">內容與文字</label>
                                 <div class="relative mb-2">
@@ -753,6 +758,7 @@
                                     <button @click="selectedElement.shapeType = 'heart'" :class="{'bg-blue-100 border-blue-500': selectedElement.shapeType === 'heart'}" class="border rounded p-1 h-8 flex justify-center items-center">♥</button>
                                 </div>
                             </div>
+                           </div>
                         </div>
                     </div>
                     
@@ -848,7 +854,7 @@
                             v-for="el in elementList" 
                             :key="el.id"
                             class="flex items-center gap-2 p-2 rounded border hover:border-blue-300 transition text-sm group"
-                            :class="{'bg-blue-50 border-blue-500': selectedElementId === el.id, 'bg-white border-transparent hover:bg-gray-50': selectedElementId !== el.id}"
+                            :class="{'bg-blue-50 border-blue-500': selectedElementId === el.id, 'bg-gray-100 border-gray-300': el.locked && selectedElementId !== el.id, 'bg-white border-transparent hover:bg-gray-50': !el.locked && selectedElementId !== el.id}"
                             @click="selectCard(currentCard.id); selectedElementId = el.id"
                         >
                             <div class="text-xs w-5 text-center flex-shrink-0">
@@ -865,8 +871,11 @@
                                 z:{{ el.z }}
                             </div>
                             <div class="flex gap-1 ml-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button @click.stop="el.locked = !el.locked" :title="el.locked ? '解鎖' : '鎖定'" class="p-1 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-800 text-xs">
+                                    {{ el.locked ? '🔒' : '🔓' }}
+                                </button>
                                 <button @click.stop="cloneElement(el)" title="複製" class="p-1 hover:bg-blue-100 rounded text-gray-500 hover:text-blue-600">📄</button>
-                                <button @click.stop="removeElement(el.id)" title="刪除" class="p-1 hover:bg-red-100 rounded text-gray-500 hover:text-red-600">🗑️</button>
+                                <button @click.stop="removeElement(el.id)" :title="el.locked ? '已鎖定' : '刪除'" :disabled="el.locked" class="p-1 rounded text-gray-500" :class="el.locked ? 'opacity-30 cursor-not-allowed' : 'hover:bg-red-100 hover:text-red-600'">🗑️</button>
                             </div>
                         </div>
                         <div v-if="currentCard.elements.length === 0" class="text-center text-gray-400 text-xs mt-4">
@@ -1727,7 +1736,8 @@
                         x: 20,
                         y: 20,
                         z: this.currentCard.elements.length + 1,
-                        rotation: 0 // New: Rotation
+                        rotation: 0,
+                        locked: false
                     };
 
                     if (type === 'text') {
@@ -1752,8 +1762,13 @@
                     this.selectedElementId = base.id;
                 },
                 removeElement(id) {
+                    const el = this.currentCard.elements.find(e => e.id === id);
+                    if (el && el.locked) return;
+
                     this.currentCard.elements = this.currentCard.elements.filter(e => e.id !== id);
-                    this.selectedElementId = null;
+                    if (this.selectedElementId === id) {
+                        this.selectedElementId = null;
+                    }
                 },
                 deselectElement() {
                     this.selectedElementId = null;
@@ -1885,6 +1900,7 @@
 
                 alignElement(align) {
                     if (!this.selectedElement) return;
+                    if (this.selectedElement.locked) return;
                     // Dynamic Card Size
                     const cardW = (this.currentCard.width || 63) * this.screenScale;
                     const cardH = (this.currentCard.height || 88) * this.screenScale;
@@ -1902,6 +1918,7 @@
 
                 bringToFront() {
                     if (!this.selectedElement) return;
+                    if (this.selectedElement.locked) return;
                     this.selectedElement.z = 100;
                     
                     // Move to end of array to ensure visual top among same z-index
@@ -1915,6 +1932,7 @@
 
                 sendToBack() {
                     if (!this.selectedElement) return;
+                    if (this.selectedElement.locked) return;
                     this.selectedElement.z = 0;
                     
                     // Move to start of array to ensure visual bottom among same z-index
@@ -2016,6 +2034,9 @@
                 startDrag(event, element) {
                     if(this.currentView !== 'editor') return;
                     this.selectedElementId = element.id;
+
+                    if (element.locked) return;
+
                     this.draggingElementId = element.id;
                     
                     // Handle Touch or Mouse
