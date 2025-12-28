@@ -1,0 +1,16 @@
+{
+  "name": "cMVP 卡片製作",
+  "short_name": "cMVP",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://placehold.co/512x512/png?text=cMVP",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
