@@ -32,11 +32,13 @@
         }
         
         /* Safe Area Utilities */
-        .safe-area-pt {
-            padding-top: calc(0.75rem + env(safe-area-inset-top));
+        .h-safe-top {
+            height: constant(safe-area-inset-top);
+            height: env(safe-area-inset-top);
         }
-        .safe-area-pb {
-            padding-bottom: env(safe-area-inset-bottom);
+        .h-safe-bottom {
+            height: constant(safe-area-inset-bottom);
+            height: env(safe-area-inset-bottom);
         }
 
         /* 防止選取文字干擾拖曳 */
@@ -136,7 +138,9 @@
     <div id="app" class="h-full flex flex-col">
         
         <!-- 頂部導航欄 (No Print) -->
-        <nav class="bg-gray-800 text-white p-3 flex flex-nowrap justify-between items-center no-print shadow-md z-50 gap-2 sticky top-0 min-h-[3.5rem] safe-area-pt">
+        <nav class="sticky top-0 z-50 shadow-md no-print bg-gray-800 text-white flex flex-col">
+            <div class="w-full bg-gray-800 h-safe-top shrink-0"></div>
+            <div class="h-14 px-3 flex flex-nowrap justify-between items-center gap-2 w-full">
             <!-- Left: Logo & Hamburger -->
             <div class="flex items-center gap-4 shrink-0">
                 <div class="flex items-center gap-3">
@@ -147,7 +151,7 @@
                     
                     <div class="flex items-baseline gap-2">
                         <h1 class="text-xl font-bold cursor-pointer hover:text-gray-300 transition" @click="currentView = 'projects'">cMVP</h1>
-                        <span class="text-[10px] md:text-xs text-gray-400 font-mono">v2.0.3</span>
+                        <span class="text-[10px] md:text-xs text-gray-400 font-mono">v2.0.4</span>
                         <span v-if="currentProject" class="text-xs text-gray-400 bg-gray-700 px-2 py-0.5 rounded-full truncate max-w-[100px] md:max-w-none hidden sm:inline">
                             {{ currentProject.name }}
                         </span>
@@ -202,6 +206,7 @@
                 
                 <!-- Mobile Menu Backdrop -->
                 <div v-if="showMobileMenu" class="fixed inset-0 z-40 bg-transparent" @click="showMobileMenu = false"></div>
+            </div>
             </div>
         </nav>
 
@@ -857,7 +862,8 @@
                 </div>
 
                 <!-- Mobile Footer Bar -->
-                <div v-if="isMobile" class="min-h-[3.5rem] bg-white border-t flex items-start justify-around shrink-0 safe-area-pb z-50 pointer-events-auto">
+                <div v-if="isMobile" class="border-t bg-white shrink-0 z-50 pointer-events-auto flex flex-col">
+                    <div class="h-14 flex items-center justify-around w-full">
                     <button 
                         v-for="tab in currentMobileTabs" 
                         :key="tab.id"
@@ -869,6 +875,8 @@
                         <span class="text-xl leading-none">{{ tab.icon }}</span>
                         <span class="text-[10px] leading-none">{{ tab.name }}</span>
                     </button>
+                    </div>
+                    <div class="w-full bg-white h-safe-bottom shrink-0"></div>
                 </div>
 
                 <!-- Desktop Layer List (Hidden on Mobile) -->
