@@ -120,7 +120,7 @@
                     
                     <div class="flex items-baseline gap-2">
                         <h1 class="text-xl font-bold cursor-pointer hover:text-gray-300 transition" @click="currentView = 'projects'">cMVP</h1>
-                        <span class="text-xs text-gray-500 font-mono hidden md:inline">v1.5.19</span>
+                        <span class="text-xs text-gray-500 font-mono hidden md:inline">v1.5.21</span>
                         <span v-if="currentProject" class="text-xs text-gray-400 bg-gray-700 px-2 py-0.5 rounded-full truncate max-w-[100px] md:max-w-none hidden sm:inline">
                             {{ currentProject.name }}
                         </span>
@@ -757,6 +757,17 @@
                     </div>
                     
                     <div v-else-if="currentCard" class="p-4 space-y-4">
+                        <!-- Add Menu (Mobile Only) -->
+                        <div v-show="isMobile && mobileInspectorTab === 'add-menu'" class="grid grid-cols-2 gap-4">
+                            <button @click="addElement('text'); mobileInspectorTab = null" class="flex flex-col items-center justify-center p-4 bg-gray-50 hover:bg-gray-100 rounded-lg border aspect-square shadow-sm">
+                                <span class="text-3xl mb-2">📝</span>
+                                <span class="font-bold text-gray-700">新增文字</span>
+                            </button>
+                            <button @click="addElement('shape'); mobileInspectorTab = null" class="flex flex-col items-center justify-center p-4 bg-gray-50 hover:bg-gray-100 rounded-lg border aspect-square shadow-sm">
+                                <span class="text-3xl mb-2">⏹️</span>
+                                <span class="font-bold text-gray-700">新增形狀</span>
+                            </button>
+                        </div>
                         <!-- Card Layout -->
                         <div v-show="!isMobile || mobileInspectorTab === 'card-layout'">
                             <label class="text-xs font-bold text-gray-500 block mb-1">卡片尺寸與方向</label>
@@ -1200,8 +1211,7 @@
                         ];
                     } else if (this.currentCard) {
                         return [
-                            { id: 'add-text', name: '文字', icon: '📝' },
-                            { id: 'add-shape', name: '形狀', icon: '⏹️' },
+                            { id: 'add-menu', name: '新增', icon: '➕' },
                             { id: 'card-layout', name: '尺寸', icon: '📏' },
                             { id: 'card-style', name: '外觀', icon: '💅' }
                         ];
@@ -1339,14 +1349,6 @@
             },
             methods: {
                 toggleMobileTab(tabId) {
-                    if (tabId === 'add-text') {
-                        this.addElement('text');
-                        return;
-                    }
-                    if (tabId === 'add-shape') {
-                        this.addElement('shape');
-                        return;
-                    }
                     if (this.mobileInspectorTab === tabId) {
                         this.mobileInspectorTab = null;
                     } else {
@@ -1359,6 +1361,7 @@
                         'layers': '層級',
                         'style': '樣式',
                         'content': '內容',
+                        'add-menu': '新增元素',
                         'card-layout': '卡片尺寸',
                         'card-style': '卡片外觀'
                     };
