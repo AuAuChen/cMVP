@@ -141,7 +141,7 @@
         
         <!-- 頂部導航欄 (No Print) -->
         <nav class="sticky top-0 z-50 shadow-md no-print bg-gray-800 text-white flex flex-col">
-            <div class="w-full bg-gray-800 h-safe-top shrink-0 md:hidden"></div>
+            <div class="w-full bg-gray-800 h-safe-top shrink-0 md:hidden" style="min-height: 44px"></div>
             <div class="h-14 px-3 flex flex-nowrap justify-between items-center gap-2 w-full">
             <!-- Left: Logo & Hamburger -->
             <div class="flex items-center gap-4 shrink-0">
@@ -153,7 +153,7 @@
                     
                     <div class="flex items-baseline gap-2">
                         <h1 class="text-xl font-bold cursor-pointer hover:text-gray-300 transition" @click="currentView = 'projects'">cMVP</h1>
-                        <span class="text-[10px] md:text-xs text-gray-400 font-mono">v2.0.9</span>
+                        <span class="text-[10px] md:text-xs text-gray-400 font-mono">v2.0.10</span>
                         <span v-if="currentProject" class="text-xs text-gray-400 bg-gray-700 px-2 py-0.5 rounded-full truncate max-w-[100px] md:max-w-none hidden sm:inline">
                             {{ currentProject.name }}
                         </span>
